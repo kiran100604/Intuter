@@ -78,15 +78,25 @@ async function sendMessage() {
                 const subjectName =
                   document.getElementById("subjectName").value;
                 const goal = document.getElementById("goal").value;
+                const outlineFile = document.getElementById("outline").files[0];
+
+                // Create FormData for file upload
+                const formData = new FormData();
+                formData.append("subjectName", subjectName);
+                formData.append("goal", goal);
+                if (outlineFile) {
+                  formData.append("outline", outlineFile);
+                }
+
                 const createSessionResponse = await fetch(
                   "http://localhost:5000/api/sessions",
                   {
                     method: "POST",
                     headers: {
-                      "Content-Type": "application/json",
                       Authorization: `Bearer ${token}`,
+                      // Don't set Content-Type header - browser sets it with boundary for FormData
                     },
-                    body: JSON.stringify({ subjectName, goal }),
+                    body: formData,
                   },
                 );
                 if (createSessionResponse.ok) {
@@ -95,6 +105,8 @@ async function sendMessage() {
                   window.location.reload();
                 } else {
                   console.error("Failed to create session");
+                  const errorData = await createSessionResponse.json();
+                  alert(`Error: ${errorData.message || 'Failed to create session'}`);
                 }
               });
             return;
