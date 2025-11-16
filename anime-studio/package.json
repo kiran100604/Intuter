@@ -1,0 +1,23 @@
+{
+  "name": "learning-app",
+  "version": "1.0.0",
+  "description": "An AI learning app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "keywords": [
+    "learning",
+    "education",
+    "electron"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "onnx-ocr-js": "^1.0.0",
+    "onnxruntime-node": "^1.16.3",
+    "@techstark/opencv-js": "^4.11.0"
+  }
+}

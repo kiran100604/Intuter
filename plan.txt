@@ -1,0 +1,801 @@
+# Backend Architecture Documentation
+## AI Learning Platform - Node.js/Express/PostgreSQL
+
+---
+
+## Table of Contents
+1. [Project Structure](#project-structure)
+2. [Technology Stack](#technology-stack)
+3. [Database Setup](#database-setup)
+4. [Core Components](#core-components)
+5. [API Endpoints](#api-endpoints)
+6. [Services Layer](#services-layer)
+7. [Middleware](#middleware)
+8. [AI Integration](#ai-integration)
+9. [File Handling](#file-handling)
+10. [Context Building System](#context-building-system)
+11. [Deployment Considerations](#deployment-considerations)
+
+---
+
+## 1. Project Structure
+
+```
+backend/
+├── src/
+│   ├── config/
+│   │   ├── database.js          # PostgreSQL connection config
+│   │   ├── env.js               # Environment variables
+│   │   └── ai.js                # AI API configuration
+│   │
+│   ├── models/
+│   │   ├── index.js             # Model exports & associations
+│   │   ├── StudySession.js
+│   │   ├── StudyMaterial.js
+│   │   ├── Topic.js
+│   │   ├── Subtopic.js
+│   │   ├── SubtopicProgress.js
+│   │   ├── LearningContent.js
+│   │   ├── ConceptMap.js
+│   │   ├── StudySummary.js
+│   │   ├── UserQuestion.js
+│   │   └── ContextCache.js
+│   │
+│   ├── controllers/
+│   │   ├── authController.js
+│   │   ├── sessionController.js
+│   │   ├── topicController.js
+│   │   ├── learningController.js
+│   │   ├── materialController.js
+│   │   ├── questionController.js
+│   │   └── progressController.js
+│   │
+│   ├── services/
+│   │   ├── ai/
+│   │   │   ├── blueprintGenerator.js    # Generate topics/subtopics
+│   │   │   ├── contentGenerator.js      # Generate learning content
+│   │   │   ├── intuitionGenerator.js    # Generate core intuitions
+│   │   │   ├── summaryGenerator.js      # Generate summaries
+│   │   │   └── questionAnswerer.js      # Answer user questions
+│   │   │
+│   │   ├── context/
+│   │   │   ├── contextBuilder.js        # Build context for AI
+│   │   │   ├── contextCache.js          # Cache management
+│   │   │   └── conceptExtractor.js      # Extract key concepts
+│   │   │
+│   │   ├── file/
+│   │   │   ├── fileUpload.js            # Handle file uploads
+│   │   │   ├── pdfExtractor.js          # Extract text from PDFs
+│   │   │   ├── docxExtractor.js         # Extract text from DOCX
+│   │   │   └── imageExtractor.js        # OCR for images
+│   │   │
+│   │   └── progress/
+│   │       ├── progressTracker.js       # Track learning progress
+│   │       └── progressAnalyzer.js      # Analyze learning patterns
+│   │
+│   ├── middleware/
+│   │   ├── auth.js                  # JWT authentication
+│   │   ├── errorHandler.js          # Global error handling
+│   │   ├── validator.js             # Request validation
+│   │   ├── rateLimiter.js           # Rate limiting
+│   │   └── fileUpload.js            # Multer configuration
+│   │
+│   ├── routes/
+│   │   ├── auth.js
+│   │   ├── sessions.js
+│   │   ├── topics.js
+│   │   ├── learning.js
+│   │   ├── materials.js
+│   │   ├── questions.js
+│   │   └── progress.js
+│   │
+│   ├── utils/
+│   │   ├── logger.js                # Winston logger
+│   │   ├── response.js              # Standard response formatter
+│   │   ├── validation.js            # Validation helpers
+│   │   └── helpers.js               # General utilities
+│   │
+│   ├── jobs/
+│   │   ├── cacheCleanup.js          # Clean expired cache
+│   │   └── summaryGenerator.js      # Background summary generation
+│   │
+│   └── app.js                       # Express app setup
+│
+├── uploads/                         # Temporary file storage
+├── .env
+├── .env.example
+├── package.json
+└── server.js                        # Entry point
+```
+
+---
+
+## 2. Technology Stack
+
+### Core Technologies
+- **Node.js** (v18+)
+- **Express.js** (v4.x)
+- **PostgreSQL** (v14+)
+- **Sequelize ORM** (v6.x)
+
+### Key Packages
+```json
+{
+  "dependencies": {
+    "express": "^4.18.2",
+    "sequelize": "^6.35.0",
+    "pg": "^8.11.3",
+    "pg-hstore": "^2.3.4",
+    
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2",
+    
+    "multer": "^1.4.5-lts.1",
+    "pdf-parse": "^1.1.1",
+    "mammoth": "^1.6.0",
+    "tesseract.js": "^5.0.3",
+    
+    "@anthropic-ai/sdk": "^0.9.1",
+    "openai": "^4.20.1",
+    
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "morgan": "^1.10.0",
+    "winston": "^3.11.0",
+    "dotenv": "^16.3.1",
+    
+    "joi": "^17.11.0",
+    "uuid": "^9.0.1",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3"
+  }
+}
+```
+
+---
+
+## 3. Database Setup
+
+### Sequelize Configuration (`config/database.js`)
+```javascript
+const { Sequelize } = require('sequelize');
+
+const sequelize = new Sequelize({
+  dialect: 'postgres',
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  username: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  logging: process.env.NODE_ENV === 'development' ? console.log : false,
+  pool: {
+    max: 10,
+    min: 2,
+    acquire: 30000,
+    idle: 10000
+  },
+  define: {
+    timestamps: true,
+    underscored: true,
+    freezeTableName: true
+  }
+});
+```
+
+### Model Associations (`models/index.js`)
+```javascript
+// Define all associations
+StudySession.hasMany(Topic, { foreignKey: 'session_id' });
+StudySession.hasMany(StudyMaterial, { foreignKey: 'session_id' });
+StudySession.hasMany(ConceptMap, { foreignKey: 'session_id' });
+StudySession.hasMany(StudySummary, { foreignKey: 'session_id' });
+StudySession.hasMany(UserQuestion, { foreignKey: 'session_id' });
+
+Topic.belongsTo(StudySession, { foreignKey: 'session_id' });
+Topic.hasMany(Subtopic, { foreignKey: 'topic_id' });
+
+Subtopic.belongsTo(Topic, { foreignKey: 'topic_id' });
+Subtopic.hasOne(SubtopicProgress, { foreignKey: 'subtopic_id' });
+Subtopic.hasMany(LearningContent, { foreignKey: 'subtopic_id' });
+```
+
+---
+
+## 4. Core Components
+
+### Authentication System
+**JWT-based authentication with secure password hashing**
+
+**Flow:**
+1. User registers → Hash password with bcrypt
+2. User logs in → Verify password, generate JWT
+3. Protected routes → Verify JWT in middleware
+
+### Session Management
+**Handle study session lifecycle**
+
+**Key Operations:**
+- Create session with subject, goal, outline
+- Extract text from uploaded outline
+- Generate topics/subtopics blueprint
+- Track current position in learning path
+- Calculate completion percentage
+
+### Content Generation Pipeline
+**Multi-step AI content generation**
+
+**Workflow:**
+1. User selects subtopic
+2. Generate core intuition (if not exists)
+3. Build context from previous learning
+4. Generate content for current step
+5. Extract and store key concepts
+6. Update progress
+7. Generate summary (background job)
+
+---
+
+## 5. API Endpoints
+
+### Authentication Routes (`/api/auth`)
+```
+POST   /register          # Create new user account
+POST   /login             # Login and get JWT token
+POST   /logout            # Invalidate token
+GET    /me                # Get current user info
+PUT    /profile           # Update user profile
+```
+
+### Session Routes (`/api/sessions`)
+```
+POST   /                  # Create new study session
+GET    /                  # Get all user sessions
+GET    /:sessionId        # Get session details with topics
+PUT    /:sessionId        # Update session (goal, current position)
+DELETE /:sessionId        # Delete session
+POST   /:sessionId/outline   # Upload course outline
+POST   /:sessionId/generate-blueprint   # Generate topics/subtopics
+GET    /:sessionId/stats      # Get session statistics
+```
+
+### Topic Routes (`/api/sessions/:sessionId/topics`)
+```
+GET    /                  # Get all topics for session
+GET    /:topicId          # Get topic with subtopics
+POST   /:topicId/intuition   # Generate core intuition
+GET    /:topicId/prerequisites   # Check prerequisites status
+```
+
+### Subtopic Routes (`/api/sessions/:sessionId/subtopics`)
+```
+GET    /:subtopicId       # Get subtopic details
+GET    /:subtopicId/progress   # Get progress for subtopic
+```
+
+### Learning Routes (`/api/learning`)
+```
+POST   /content/generate      # Generate learning content
+GET    /content/:contentId    # Get specific content
+POST   /content/:contentId/regenerate   # Regenerate content
+
+POST   /progress/step-complete   # Mark step as completed
+GET    /progress/session/:sessionId   # Get all progress
+
+POST   /questions/ask         # Ask a question
+GET    /questions/:questionId   # Get question with answer
+POST   /questions/:questionId/feedback   # Provide feedback
+```
+
+### Material Routes (`/api/materials`)
+```
+POST   /upload            # Upload study material
+GET    /:materialId       # Get material details
+DELETE /:materialId       # Delete material
+GET    /session/:sessionId   # Get all materials for session
+```
+
+### Progress Routes (`/api/progress`)
+```
+GET    /session/:sessionId   # Overall session progress
+GET    /topic/:topicId       # Topic progress
+GET    /analytics/:sessionId   # Learning analytics
+```
+
+---
+
+## 6. Services Layer
+
+### AI Services
+
+#### Blueprint Generator (`services/ai/blueprintGenerator.js`)
+**Purpose:** Generate topics and subtopics from course outline
+
+**Process:**
+1. Take subject name, goal, and outline text
+2. Prompt AI to create structured curriculum
+3. Parse response into topics with subtopics
+4. Save to database with proper ordering
+5. Set prerequisites based on dependencies
+
+**AI Prompt Structure:**
+```
+You are an expert curriculum designer. Based on the following:
+- Subject: {subject_name}
+- Learning Goal: {goal}
+- Course Outline: {outline_text}
+
+Create a structured learning path with:
+1. Main topics (5-10 topics)
+2. Subtopics under each (3-7 subtopics)
+3. Prerequisites for each topic
+4. Difficulty level
+5. Estimated duration
+
+Return as JSON...
+```
+
+#### Content Generator (`services/ai/contentGenerator.js`)
+**Purpose:** Generate learning content for intro/understanding/mastering steps
+
+**Process:**
+1. Get subtopic and current step
+2. Build context (previous learnings, core intuition)
+3. Generate content based on step type
+4. Extract key concepts from generated content
+5. Save content and concepts
+6. Update progress
+
+**Context Building:**
+- Include core intuition for topic
+- Include summaries of completed subtopics
+- Include key concepts learned
+- Include prerequisite knowledge
+- Limit context to most recent/relevant items
+
+**Step-Specific Prompting:**
+- **Introduction:** Focus on "what" and "why", build intuition
+- **Understanding:** Focus on "how", detailed explanations
+- **Mastering:** Focus on application, examples, edge cases
+
+#### Intuition Generator (`services/ai/intuitionGenerator.js`)
+**Purpose:** Generate core intuition for a topic (once per topic)
+
+**Process:**
+1. Take topic name and description
+2. Generate fundamental understanding
+3. Create mental model/analogy
+4. Save to Topic model
+5. Use in all subsequent content generation
+
+#### Summary Generator (`services/ai/summaryGenerator.js`)
+**Purpose:** Generate concise summaries for efficient context
+
+**Process:**
+1. Triggered when step completed
+2. Summarize what was learned in that step
+3. Extract key points (3-5 bullet points)
+4. Save to StudySummary model
+5. Update ContextCache
+
+**Background Job:** Run as async job to not block user
+
+#### Question Answerer (`services/ai/questionAnswerer.js`)
+**Purpose:** Answer user questions based on learned content
+
+**Process:**
+1. Receive user question
+2. Build context from learned topics/concepts
+3. Query AI with context + question
+4. Store question and answer
+5. Track which context was used
+
+---
+
+### Context Services
+
+#### Context Builder (`services/context/contextBuilder.js`)
+**Purpose:** Build optimized context for AI content generation
+
+**Key Functions:**
+
+**`buildContextForContent(sessionId, topicId, subtopicId, step)`**
+- Get core intuition for topic
+- Get summaries of completed topics
+- Get summaries of completed subtopics in current topic
+- Get key concepts (limit to top 20 most recent/relevant)
+- Format for AI prompt
+
+**`buildContextForQuestion(sessionId, question)`**
+- Analyze question to identify relevant topics
+- Get summaries of those topics
+- Get related concepts
+- Limit context size for performance
+
+**Context Prioritization:**
+1. Current topic intuition (highest priority)
+2. Prerequisite topics summaries
+3. Related concepts
+4. Recent learnings
+5. General session context
+
+#### Context Cache (`services/context/contextCache.js`)
+**Purpose:** Cache frequently used context data
+
+**Cached Items:**
+- Completed topics list
+- All concepts for session
+- Topic summaries
+- Session statistics
+
+**Cache Strategy:**
+- TTL: 30 minutes for most data
+- Invalidate on updates (step completion, new content)
+- Store in ContextCache model
+
+#### Concept Extractor (`services/context/conceptExtractor.js`)
+**Purpose:** Extract key concepts from generated content
+
+**Process:**
+1. Take generated content text
+2. Prompt AI to extract key concepts
+3. Get concept name + brief explanation
+4. Classify importance (high/medium/low)
+5. Save to ConceptMap model
+
+---
+
+### File Services
+
+#### File Upload (`services/file/fileUpload.js`)
+**Purpose:** Handle file uploads with validation
+
+**Features:**
+- File type validation
+- Size limits (10MB for PDFs, 5MB for images)
+- Unique filename generation
+- Storage to uploads directory or cloud storage
+
+#### PDF Extractor (`services/file/pdfExtractor.js`)
+**Purpose:** Extract text from PDF files
+
+**Library:** pdf-parse
+**Process:**
+1. Read PDF buffer
+2. Extract text content
+3. Clean and format text
+4. Handle multi-page documents
+5. Return structured text
+
+#### DOCX Extractor (`services/file/docxExtractor.js`)
+**Purpose:** Extract text from Word documents
+
+**Library:** mammoth
+**Process:**
+1. Read DOCX file
+2. Convert to plain text or HTML
+3. Strip formatting
+4. Return clean text
+
+#### Image Extractor (`services/file/imageExtractor.js`)
+**Purpose:** OCR for images (course outline photos)
+
+**Library:** Tesseract.js
+**Process:**
+1. Load image
+2. Run OCR
+3. Clean recognized text
+4. Return extracted text
+
+---
+
+### Progress Services
+
+#### Progress Tracker (`services/progress/progressTracker.js`)
+**Purpose:** Track and update learning progress
+
+**Key Functions:**
+
+**`markStepComplete(subtopicId, step)`**
+- Update SubtopicProgress
+- Set completion flag and timestamp
+- Move to next step
+- Trigger summary generation job
+
+**`getSessionProgress(sessionId)`**
+- Calculate overall completion %
+- Get topics completed/in-progress/not-started
+- Calculate time spent
+- Return statistics
+
+**`getNextRecommendation(sessionId)`**
+- Analyze current progress
+- Check prerequisites
+- Recommend next subtopic to study
+
+#### Progress Analyzer (`services/progress/progressAnalyzer.js`)
+**Purpose:** Analyze learning patterns
+
+**Analytics:**
+- Average time per step
+- Completion rate
+- Topics mastered
+- Questions asked frequency
+- Learning velocity
+
+---
+
+## 7. Middleware
+
+### Authentication Middleware (`middleware/auth.js`)
+```javascript
+// Verify JWT token
+exports.authenticate = async (req, res, next) => {
+  // Extract token from header
+  // Verify token
+  // Attach user to request
+  // Call next()
+};
+
+// Check if user owns resource
+exports.authorize = (model) => {
+  // Verify resource belongs to authenticated user
+};
+```
+
+### Error Handler (`middleware/errorHandler.js`)
+```javascript
+// Global error handling
+exports.errorHandler = (err, req, res, next) => {
+  // Log error
+  // Format error response
+  // Send appropriate status code
+};
+
+// Async error wrapper
+exports.asyncHandler = (fn) => {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
+```
+
+### Validator (`middleware/validator.js`)
+```javascript
+// Using Joi for request validation
+exports.validateSession = (req, res, next) => {
+  // Validate session creation data
+};
+
+exports.validateContent = (req, res, next) => {
+  // Validate content generation request
+};
+```
+
+### Rate Limiter (`middleware/rateLimiter.js`)
+```javascript
+// Protect AI endpoints from abuse
+exports.aiRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // 50 requests per window
+  message: 'Too many AI requests'
+});
+
+exports.generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200
+});
+```
+
+---
+
+## 8. AI Integration
+
+### AI Provider Setup
+
+**Claude (Anthropic)**
+```javascript
+const Anthropic = require('@anthropic-ai/sdk');
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+async function generateContent(prompt, maxTokens = 4000) {
+  const message = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: maxTokens,
+    messages: [
+      { role: 'user', content: prompt }
+    ],
+  });
+  
+  return message.content[0].text;
+}
+```
+
+**OpenAI (Alternative)**
+```javascript
+const OpenAI = require('openai');
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+async function generateContent(prompt, maxTokens = 4000) {
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4-turbo-preview',
+    messages: [
+      { role: 'user', content: prompt }
+    ],
+    max_tokens: maxTokens,
+  });
+  
+  return completion.choices[0].message.content;
+}
+```
+
+### Prompt Templates
+
+Store reusable prompts in separate files:
+
+**`prompts/blueprintPrompt.js`**
+**`prompts/contentPrompts.js`**
+**`prompts/intuitionPrompt.js`**
+**`prompts/summaryPrompt.js`**
+**`prompts/questionPrompt.js`**
+
+---
+
+## 9. File Handling
+
+### Multer Configuration
+```javascript
+const multer = require('multer');
+const path = require('path');
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png'];
+  
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type'), false);
+  }
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
+```
+
+---
+
+## 10. Context Building System
+
+### Context Flow
+
+**When Generating Content:**
+1. **Check Cache** - Look for cached context
+2. **Build Context** - If not cached:
+   - Get topic core intuition
+   - Get completed topics summaries
+   - Get completed subtopics in current topic
+   - Get top 20 relevant concepts
+3. **Format Context** - Structure for AI prompt
+4. **Generate Content** - Send to AI
+5. **Update Cache** - Store for future use
+
+**Context Size Management:**
+- Limit summaries to 200 words each
+- Limit concepts to top 20 by recency/relevance
+- Prioritize current topic context
+- Use compression for long context
+
+**Performance Optimization:**
+- Cache context for 30 minutes
+- Parallel queries for context building
+- Pre-generate summaries in background
+- Index frequently queried fields
+
+---
+
+## 11. Deployment Considerations
+
+### Environment Variables
+```
+NODE_ENV=production
+PORT=5000
+
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=intuter_db
+DB_USER=postgres
+DB_PASSWORD=your_password
+
+JWT_SECRET=your_jwt_secret
+JWT_EXPIRE=7d
+
+ANTHROPIC_API_KEY=your_api_key
+OPENAI_API_KEY=your_api_key
+
+AWS_BUCKET=your_s3_bucket
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY=your_key
+AWS_SECRET_KEY=your_secret
+
+REDIS_URL=redis://localhost:6379
+
+LOG_LEVEL=info
+```
+
+### Performance Optimization
+1. **Database Indexes**
+   - Index foreign keys
+   - Index frequently queried fields (session_id, user_id)
+   - Composite indexes for unique constraints
+
+2. **Caching Strategy**
+   - Redis for session data
+   - Database-level caching for context
+   - HTTP caching headers
+
+3. **API Optimization**
+   - Pagination for list endpoints
+   - Lazy loading for related data
+   - Response compression
+
+4. **Background Jobs**
+   - Summary generation
+   - Cache cleanup
+   - Analytics computation
+
+### Security Measures
+1. **Authentication:** JWT with HTTP-only cookies
+2. **Password Security:** Bcrypt with salt rounds
+3. **Input Validation:** Joi schemas for all inputs
+4. **Rate Limiting:** Protect AI endpoints
+5. **CORS:** Whitelist frontend domain
+6. **Helmet:** Security headers
+7. **SQL Injection:** Sequelize parameterized queries
+8. **File Upload:** Validate types and sizes
+
+### Monitoring & Logging
+1. **Winston Logger:** Structured logging
+2. **Error Tracking:** Sentry or similar
+3. **Performance Monitoring:** New Relic or DataDog
+4. **API Metrics:** Request/response times
+5. **AI Usage Tracking:** Token consumption, costs
+
+---
+
+## Next Steps
+
+1. **Set up basic Express server**
+2. **Configure Sequelize and create models**
+3. **Implement authentication system**
+4. **Build session management endpoints**
+5. **Integrate AI service for blueprint generation**
+6. **Build content generation pipeline**
+7. **Implement context building system**
+8. **Add file upload and extraction**
+9. **Create progress tracking**
+10. **Test and optimize**
+
+Would you like me to provide the actual implementation code for any specific component?

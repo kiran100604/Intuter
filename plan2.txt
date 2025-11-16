@@ -1,0 +1,2831 @@
+# Detailed Implementation Plan - Industry Standards
+## AI Learning Platform Backend
+
+---
+
+## Table of Contents
+1. [Implementation Order](#implementation-order)
+2. [Controllers - Detailed Specifications](#controllers-detailed-specifications)
+3. [Services - Detailed Specifications](#services-detailed-specifications)
+4. [API Request/Response Formats](#api-requestresponse-formats)
+5. [Error Handling Strategy](#error-handling-strategy)
+6. [Validation Schemas](#validation-schemas)
+7. [Testing Strategy](#testing-strategy)
+
+---
+
+## 1. Implementation Order
+
+### Phase 1: Core Foundation (Week 1)
+1. ✅ Set up Sequelize models and associations
+2. ✅ Configure database connection
+3. ✅ Set up authentication (JWT)
+4. **Implement basic CRUD for sessions**
+5. **Implement file upload and text extraction**
+
+### Phase 2: AI Integration (Week 2)
+6. **Implement blueprint generation service**
+7. **Implement core intuition generation**
+8. **Implement content generation (intro/understanding/mastering)**
+9. **Connect controllers to AI services**
+
+### Phase 3: Context & Progress (Week 3)
+10. **Implement context building system**
+11. **Implement concept extraction**
+12. **Implement progress tracking**
+13. **Implement summary generation**
+
+### Phase 4: Advanced Features (Week 4)
+14. **Implement Q&A system**
+15. **Implement caching strategy**
+16. **Add analytics and progress analysis**
+17. **Background jobs setup**
+
+### Phase 5: Testing & Optimization (Week 5)
+18. **Write unit tests**
+19. **Write integration tests**
+20. **Performance optimization**
+21. **Security audit**
+
+---
+
+## 2. Controllers - Detailed Specifications
+
+### 2.1 Auth Controller (`controllers/authController.js`)
+
+```javascript
+/**
+ * @file authController.js
+ * @description Handles user authentication and authorization
+ */
+
+// ============================================
+// FUNCTION: register
+// ============================================
+/**
+ * Register a new user
+ * 
+ * @route POST /api/auth/register
+ * @access Public
+ * 
+ * @param {Object} req.body
+ * @param {string} req.body.name - User's full name
+ * @param {string} req.body.email - User's email (unique)
+ * @param {string} req.body.password - Password (min 8 chars)
+ * 
+ * @returns {Object} response
+ * @returns {string} response.token - JWT token
+ * @returns {Object} response.user - User object (without password)
+ * 
+ * @example
+ * Request:
+ * POST /api/auth/register
+ * {
+ *   "name": "John Doe",
+ *   "email": "john@example.com",
+ *   "password": "SecurePass123"
+ * }
+ * 
+ * Response (201):
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+ *     "user": {
+ *       "id": 1,
+ *       "name": "John Doe",
+ *       "email": "john@example.com",
+ *       "createdAt": "2024-01-15T10:30:00Z"
+ *     }
+ *   }
+ * }
+ * 
+ * @workflow
+ * 1. Validate input (email format, password strength)
+ * 2. Check if email already exists
+ * 3. Hash password with bcrypt (10 salt rounds)
+ * 4. Create user in database
+ * 5. Generate JWT token (expires in 7 days)
+ * 6. Return token and user data
+ * 
+ * @errors
+ * - 400: Invalid input data
+ * - 409: Email already registered
+ * - 500: Server error
+ */
+exports.register = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: login
+// ============================================
+/**
+ * Login existing user
+ * 
+ * @route POST /api/auth/login
+ * @access Public
+ * 
+ * @param {Object} req.body
+ * @param {string} req.body.email - User's email
+ * @param {string} req.body.password - User's password
+ * 
+ * @returns {Object} response
+ * @returns {string} response.token - JWT token
+ * @returns {Object} response.user - User object
+ * 
+ * @workflow
+ * 1. Validate input
+ * 2. Find user by email
+ * 3. Compare password with bcrypt
+ * 4. Generate JWT token
+ * 5. Update last_login timestamp
+ * 6. Return token and user data
+ * 
+ * @errors
+ * - 400: Invalid credentials
+ * - 401: Incorrect password
+ * - 404: User not found
+ * - 500: Server error
+ */
+exports.login = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: getMe
+// ============================================
+/**
+ * Get current authenticated user
+ * 
+ * @route GET /api/auth/me
+ * @access Private
+ * 
+ * @returns {Object} response
+ * @returns {Object} response.user - User object with stats
+ * @returns {number} response.user.totalSessions - Count of study sessions
+ * @returns {number} response.user.completedTopics - Count of completed topics
+ * 
+ * @workflow
+ * 1. Get user from req.user (set by auth middleware)
+ * 2. Fetch user stats (sessions count, progress)
+ * 3. Return user data with stats
+ * 
+ * @errors
+ * - 401: Not authenticated
+ * - 404: User not found
+ * - 500: Server error
+ */
+exports.getMe = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: updateProfile
+// ============================================
+/**
+ * Update user profile
+ * 
+ * @route PUT /api/auth/profile
+ * @access Private
+ * 
+ * @param {Object} req.body
+ * @param {string} [req.body.name] - New name
+ * @param {string} [req.body.email] - New email
+ * 
+ * @workflow
+ * 1. Validate input
+ * 2. Check if new email is available
+ * 3. Update user data
+ * 4. Return updated user
+ * 
+ * @errors
+ * - 400: Invalid input
+ * - 409: Email already taken
+ * - 500: Server error
+ */
+exports.updateProfile = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: changePassword
+// ============================================
+/**
+ * Change user password
+ * 
+ * @route PUT /api/auth/password
+ * @access Private
+ * 
+ * @param {Object} req.body
+ * @param {string} req.body.currentPassword
+ * @param {string} req.body.newPassword
+ * 
+ * @workflow
+ * 1. Verify current password
+ * 2. Validate new password strength
+ * 3. Hash new password
+ * 4. Update in database
+ * 5. Invalidate old tokens (optional)
+ * 
+ * @errors
+ * - 401: Incorrect current password
+ * - 400: Weak new password
+ * - 500: Server error
+ */
+exports.changePassword = async (req, res, next) => {
+  // Implementation here
+};
+```
+
+---
+
+### 2.2 Session Controller (`controllers/sessionController.js`)
+
+```javascript
+/**
+ * @file sessionController.js
+ * @description Handles study session management
+ */
+
+// ============================================
+// FUNCTION: createSession
+// ============================================
+/**
+ * Create a new study session
+ * 
+ * @route POST /api/sessions
+ * @access Private
+ * 
+ * @param {Object} req.body
+ * @param {string} req.body.subjectName - Subject name (e.g., "Linear Algebra")
+ * @param {string} req.body.goal - Learning goal
+ * 
+ * @returns {Object} response
+ * @returns {Object} response.session - Created session
+ * 
+ * @example
+ * Request:
+ * POST /api/sessions
+ * {
+ *   "subjectName": "Machine Learning",
+ *   "goal": "Master ML fundamentals for job interview"
+ * }
+ * 
+ * Response (201):
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "session": {
+ *       "id": 1,
+ *       "sessionId": "sess_abc123xyz",
+ *       "subjectName": "Machine Learning",
+ *       "goal": "Master ML fundamentals for job interview",
+ *       "status": "setup",
+ *       "blueprintGenerated": false,
+ *       "createdDate": "2024-01-15T10:30:00Z"
+ *     }
+ *   }
+ * }
+ * 
+ * @workflow
+ * 1. Validate input (subject name, goal)
+ * 2. Generate unique session_id (e.g., 'sess_' + uuid)
+ * 3. Create session in database with status='setup'
+ * 4. Return created session
+ * 
+ * @errors
+ * - 400: Invalid input
+ * - 500: Server error
+ */
+exports.createSession = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: uploadOutline
+// ============================================
+/**
+ * Upload course outline and extract text
+ * 
+ * @route POST /api/sessions/:sessionId/outline
+ * @access Private
+ * 
+ * @param {string} req.params.sessionId
+ * @param {File} req.file - Uploaded file (PDF, DOCX, or Image)
+ * 
+ * @returns {Object} response
+ * @returns {Object} response.session - Updated session with extracted text
+ * 
+ * @workflow
+ * 1. Verify session belongs to user
+ * 2. Validate file type and size
+ * 3. Save file to storage (disk or S3)
+ * 4. Extract text based on file type:
+ *    - PDF: Use pdfExtractor service
+ *    - DOCX: Use docxExtractor service
+ *    - Image: Use imageExtractor service (OCR)
+ * 5. Update session with file path and extracted text
+ * 6. Return updated session
+ * 
+ * @errors
+ * - 400: Invalid file type/size
+ * - 404: Session not found
+ * - 403: Not authorized
+ * - 500: Extraction failed
+ */
+exports.uploadOutline = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: generateBlueprint
+// ============================================
+/**
+ * Generate topics and subtopics from outline
+ * 
+ * @route POST /api/sessions/:sessionId/generate-blueprint
+ * @access Private
+ * 
+ * @param {string} req.params.sessionId
+ * 
+ * @returns {Object} response
+ * @returns {Array} response.topics - Generated topics with subtopics
+ * 
+ * @workflow
+ * 1. Verify session has outline text
+ * 2. Call blueprintGenerator service with:
+ *    - subjectName
+ *    - goal
+ *    - outlineText
+ * 3. Parse AI response (JSON format)
+ * 4. Create Topic records in database
+ * 5. Create Subtopic records for each topic
+ * 6. Set prerequisites based on dependencies
+ * 7. Update session: blueprintGenerated = true, status = 'active'
+ * 8. Return topics with subtopics
+ * 
+ * @errors
+ * - 400: No outline uploaded
+ * - 404: Session not found
+ * - 500: AI generation failed
+ * - 502: AI response parsing failed
+ */
+exports.generateBlueprint = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: getAllSessions
+// ============================================
+/**
+ * Get all sessions for authenticated user
+ * 
+ * @route GET /api/sessions
+ * @access Private
+ * 
+ * @param {Object} req.query
+ * @param {string} [req.query.status] - Filter by status
+ * @param {number} [req.query.page=1] - Page number
+ * @param {number} [req.query.limit=10] - Items per page
+ * @param {string} [req.query.sortBy='lastAccessed'] - Sort field
+ * @param {string} [req.query.order='DESC'] - Sort order
+ * 
+ * @returns {Object} response
+ * @returns {Array} response.sessions - List of sessions
+ * @returns {Object} response.pagination - Pagination info
+ * 
+ * @workflow
+ * 1. Build query with filters
+ * 2. Add pagination (limit, offset)
+ * 3. Add sorting
+ * 4. Include related data:
+ *    - Topic count
+ *    - Completion percentage
+ * 5. Return sessions with pagination
+ * 
+ * @errors
+ * - 400: Invalid query params
+ * - 500: Server error
+ */
+exports.getAllSessions = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: getSessionById
+// ============================================
+/**
+ * Get session details with topics and progress
+ * 
+ * @route GET /api/sessions/:sessionId
+ * @access Private
+ * 
+ * @param {string} req.params.sessionId
+ * 
+ * @returns {Object} response
+ * @returns {Object} response.session - Session details
+ * @returns {Array} response.session.topics - Topics with subtopics
+ * @returns {Object} response.stats - Session statistics
+ * 
+ * @workflow
+ * 1. Fetch session with all topics and subtopics
+ * 2. Include progress for each subtopic
+ * 3. Calculate statistics:
+ *    - Total topics/subtopics
+ *    - Completed count
+ *    - In-progress count
+ *    - Completion percentage
+ *    - Time spent
+ * 4. Update lastAccessed timestamp
+ * 5. Return session with stats
+ * 
+ * @errors
+ * - 404: Session not found
+ * - 403: Not authorized
+ * - 500: Server error
+ */
+exports.getSessionById = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: updateSession
+// ============================================
+/**
+ * Update session details
+ * 
+ * @route PUT /api/sessions/:sessionId
+ * @access Private
+ * 
+ * @param {string} req.params.sessionId
+ * @param {Object} req.body
+ * @param {string} [req.body.goal] - Updated goal
+ * @param {string} [req.body.status] - Updated status
+ * @param {number} [req.body.currentTopicId] - Current topic ID
+ * @param {number} [req.body.currentSubtopicId] - Current subtopic ID
+ * 
+ * @workflow
+ * 1. Validate input
+ * 2. Verify ownership
+ * 3. Update allowed fields
+ * 4. Return updated session
+ * 
+ * @errors
+ * - 400: Invalid input
+ * - 404: Session not found
+ * - 403: Not authorized
+ * - 500: Server error
+ */
+exports.updateSession = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: deleteSession
+// ============================================
+/**
+ * Delete a session (soft delete)
+ * 
+ * @route DELETE /api/sessions/:sessionId
+ * @access Private
+ * 
+ * @param {string} req.params.sessionId
+ * 
+ * @workflow
+ * 1. Verify ownership
+ * 2. Update status to 'archived' (soft delete)
+ * 3. Or permanently delete with CASCADE
+ * 4. Return success message
+ * 
+ * @errors
+ * - 404: Session not found
+ * - 403: Not authorized
+ * - 500: Server error
+ */
+exports.deleteSession = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: getSessionStats
+// ============================================
+/**
+ * Get detailed statistics for a session
+ * 
+ * @route GET /api/sessions/:sessionId/stats
+ * @access Private
+ * 
+ * @param {string} req.params.sessionId
+ * 
+ * @returns {Object} response
+ * @returns {Object} response.stats - Detailed statistics
+ * 
+ * @workflow
+ * 1. Calculate:
+ *    - Total topics/subtopics
+ *    - Completion breakdown by step
+ *    - Average time per step
+ *    - Total study time
+ *    - Questions asked
+ *    - Concepts learned
+ * 2. Return statistics
+ * 
+ * @errors
+ * - 404: Session not found
+ * - 403: Not authorized
+ * - 500: Server error
+ */
+exports.getSessionStats = async (req, res, next) => {
+  // Implementation here
+};
+```
+
+---
+
+### 2.3 Topic Controller (`controllers/topicController.js`)
+
+```javascript
+/**
+ * @file topicController.js
+ * @description Handles topic and subtopic operations
+ */
+
+// ============================================
+// FUNCTION: getAllTopics
+// ============================================
+/**
+ * Get all topics for a session
+ * 
+ * @route GET /api/sessions/:sessionId/topics
+ * @access Private
+ * 
+ * @param {string} req.params.sessionId
+ * 
+ * @returns {Object} response
+ * @returns {Array} response.topics - Topics with completion status
+ * 
+ * @workflow
+ * 1. Verify session access
+ * 2. Fetch all topics with subtopics
+ * 3. Include progress for each subtopic
+ * 4. Calculate completion status for each topic
+ * 5. Check if prerequisites are met
+ * 6. Return topics sorted by order
+ * 
+ * @errors
+ * - 404: Session not found
+ * - 403: Not authorized
+ * - 500: Server error
+ */
+exports.getAllTopics = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: getTopicById
+// ============================================
+/**
+ * Get topic details with all subtopics
+ * 
+ * @route GET /api/sessions/:sessionId/topics/:topicId
+ * @access Private
+ * 
+ * @param {string} req.params.sessionId
+ * @param {string} req.params.topicId
+ * 
+ * @returns {Object} response
+ * @returns {Object} response.topic - Topic with subtopics and progress
+ * 
+ * @workflow
+ * 1. Fetch topic with subtopics
+ * 2. Include progress for each subtopic
+ * 3. Include core intuition if generated
+ * 4. Check prerequisites status
+ * 5. Return topic data
+ * 
+ * @errors
+ * - 404: Topic not found
+ * - 403: Not authorized
+ * - 500: Server error
+ */
+exports.getTopicById = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: generateCoreIntuition
+// ============================================
+/**
+ * Generate core intuition for a topic
+ * 
+ * @route POST /api/sessions/:sessionId/topics/:topicId/intuition
+ * @access Private
+ * 
+ * @param {string} req.params.sessionId
+ * @param {string} req.params.topicId
+ * 
+ * @returns {Object} response
+ * @returns {string} response.coreIntuition - Generated intuition
+ * 
+ * @workflow
+ * 1. Check if intuition already exists
+ * 2. If not, call intuitionGenerator service with:
+ *    - topicName
+ *    - description
+ *    - subjectContext
+ * 3. Save generated intuition to Topic
+ * 4. Set intuitionGenerated = true
+ * 5. Return intuition
+ * 
+ * @errors
+ * - 404: Topic not found
+ * - 409: Intuition already generated
+ * - 500: AI generation failed
+ */
+exports.generateCoreIntuition = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: checkPrerequisites
+// ============================================
+/**
+ * Check if topic prerequisites are met
+ * 
+ * @route GET /api/sessions/:sessionId/topics/:topicId/prerequisites
+ * @access Private
+ * 
+ * @param {string} req.params.sessionId
+ * @param {string} req.params.topicId
+ * 
+ * @returns {Object} response
+ * @returns {boolean} response.isAvailable - Can start this topic
+ * @returns {Array} response.prerequisites - List of prerequisite topics
+ * @returns {Array} response.incomplete - Incomplete prerequisites
+ * 
+ * @workflow
+ * 1. Get topic prerequisites list
+ * 2. For each prerequisite:
+ *    - Check if all subtopics are completed
+ * 3. Return availability status and details
+ * 
+ * @errors
+ * - 404: Topic not found
+ * - 500: Server error
+ */
+exports.checkPrerequisites = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: getSubtopic
+// ============================================
+/**
+ * Get subtopic details
+ * 
+ * @route GET /api/sessions/:sessionId/subtopics/:subtopicId
+ * @access Private
+ * 
+ * @param {string} req.params.sessionId
+ * @param {string} req.params.subtopicId
+ * 
+ * @returns {Object} response
+ * @returns {Object} response.subtopic - Subtopic with progress
+ * 
+ * @workflow
+ * 1. Fetch subtopic with topic
+ * 2. Get or create progress record
+ * 3. Return subtopic with progress
+ * 
+ * @errors
+ * - 404: Subtopic not found
+ * - 403: Not authorized
+ * - 500: Server error
+ */
+exports.getSubtopic = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: getSubtopicProgress
+// ============================================
+/**
+ * Get progress for a subtopic
+ * 
+ * @route GET /api/sessions/:sessionId/subtopics/:subtopicId/progress
+ * @access Private
+ * 
+ * @param {string} req.params.sessionId
+ * @param {string} req.params.subtopicId
+ * 
+ * @returns {Object} response
+ * @returns {Object} response.progress - Progress details
+ * @returns {string} response.nextStep - Next step to complete
+ * 
+ * @workflow
+ * 1. Get progress record
+ * 2. Calculate next step
+ * 3. Return progress with next step
+ * 
+ * @errors
+ * - 404: Subtopic not found
+ * - 500: Server error
+ */
+exports.getSubtopicProgress = async (req, res, next) => {
+  // Implementation here
+};
+```
+
+---
+
+### 2.4 Learning Controller (`controllers/learningController.js`)
+
+```javascript
+/**
+ * @file learningController.js
+ * @description Handles learning content generation and management
+ */
+
+// ============================================
+// FUNCTION: generateContent
+// ============================================
+/**
+ * Generate learning content for a subtopic step
+ * 
+ * @route POST /api/learning/content/generate
+ * @access Private
+ * 
+ * @param {Object} req.body
+ * @param {string} req.body.sessionId
+ * @param {number} req.body.subtopicId
+ * @param {string} req.body.step - 'introduction' | 'understanding' | 'mastering'
+ * 
+ * @returns {Object} response
+ * @returns {Object} response.content - Generated content
+ * 
+ * @example
+ * Request:
+ * POST /api/learning/content/generate
+ * {
+ *   "sessionId": "sess_abc123",
+ *   "subtopicId": 5,
+ *   "step": "introduction"
+ * }
+ * 
+ * Response (201):
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "content": {
+ *       "id": 10,
+ *       "subtopicId": 5,
+ *       "step": "introduction",
+ *       "content": "# Introduction to Eigenvectors...",
+ *       "generatedAt": "2024-01-15T10:30:00Z"
+ *     }
+ *   }
+ * }
+ * 
+ * @workflow
+ * 1. Verify session and subtopic access
+ * 2. Get or create progress record
+ * 3. Check if step is valid (can't jump steps)
+ * 4. Check if content already exists:
+ *    - If exists, return existing content
+ *    - If not, generate new
+ * 5. Generate core intuition if not exists (for topic)
+ * 6. Build context using contextBuilder service:
+ *    - Get core intuition
+ *    - Get completed topics summaries
+ *    - Get completed subtopics in current topic
+ *    - Get relevant concepts
+ * 7. Call contentGenerator service with:
+ *    - subtopic info
+ *    - step type
+ *    - built context
+ * 8. Save generated content to LearningContent
+ * 9. Extract and save key concepts (async)
+ * 10. Update progress (started_at if first step)
+ * 11. Return content
+ * 
+ * @errors
+ * - 400: Invalid step or prerequisites not met
+ * - 404: Subtopic not found
+ * - 403: Not authorized
+ * - 500: AI generation failed
+ */
+exports.generateContent = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: getContent
+// ============================================
+/**
+ * Get specific learning content
+ * 
+ * @route GET /api/learning/content/:contentId
+ * @access Private
+ * 
+ * @param {string} req.params.contentId
+ * 
+ * @returns {Object} response
+ * @returns {Object} response.content - Content details
+ * 
+ * @workflow
+ * 1. Fetch content with subtopic
+ * 2. Verify access
+ * 3. Return content
+ * 
+ * @errors
+ * - 404: Content not found
+ * - 403: Not authorized
+ * - 500: Server error
+ */
+exports.getContent = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: regenerateContent
+// ============================================
+/**
+ * Regenerate content if user is unsatisfied
+ * 
+ * @route POST /api/learning/content/:contentId/regenerate
+ * @access Private
+ * 
+ * @param {string} req.params.contentId
+ * @param {Object} req.body
+ * @param {string} [req.body.feedback] - User feedback on why regenerating
+ * 
+ * @returns {Object} response
+ * @returns {Object} response.content - Regenerated content
+ * 
+ * @workflow
+ * 1. Verify content ownership
+ * 2. Increment regeneratedCount
+ * 3. Build fresh context
+ * 4. Call contentGenerator with slightly different prompt
+ * 5. Update existing content record
+ * 6. Log feedback for improvement
+ * 7. Return new content
+ * 
+ * @errors
+ * - 404: Content not found
+ * - 403: Not authorized
+ * - 429: Too many regenerations
+ * - 500: AI generation failed
+ */
+exports.regenerateContent = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: markStepComplete
+// ============================================
+/**
+ * Mark a learning step as completed
+ * 
+ * @route POST /api/learning/progress/step-complete
+ * @access Private
+ * 
+ * @param {Object} req.body
+ * @param {number} req.body.subtopicId
+ * @param {string} req.body.step - Step being completed
+ * 
+ * @returns {Object} response
+ * @returns {Object} response.progress - Updated progress
+ * @returns {string} response.nextStep - Next step to work on
+ * 
+ * @workflow
+ * 1. Verify subtopic access
+ * 2. Get progress record
+ * 3. Update progress using progressTracker service:
+ *    - Set completion flag
+ *    - Set timestamp
+ *    - Move to next step
+ * 4. If step is 'mastering' (final):
+ *    - Mark subtopic as completed
+ *    - Generate summary (background job)
+ *    - Check if topic is now complete
+ * 5. Return updated progress and next step
+ * 
+ * @errors
+ * - 400: Invalid step
+ * - 404: Subtopic not found
+ * - 409: Step already completed
+ * - 500: Server error
+ */
+exports.markStepComplete = async (req, res, next) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: getSessionProgress
+// ============================================
+/**
+ * Get all progress for a session
+ * 
+ * @route GET /api/learning/progress/session/:sessionId
+ * @access Private
+ * 
+ * @param {string} req.params.sessionId
+ * 
+ * @returns {Object} response
+ * @returns {Array} response.progress - Progress for all subtopics
+ * @returns {Object} response.summary - Overall progress summary
+ * 
+ * @workflow
+ * 1. Fetch all progress records for session
+ * 2. Calculate summary statistics
+ * 3. Return progress data
+ * 
+ * @errors
+ * - 404: Session not found
+ * - 403: Not authorized
+ * - 500: Server error
+ */
+exports.getSessionProgress = async (req, res, next) => {
+  // Implementation here
+};
+```
+
+---
+
+## 3. Services - Detailed Specifications
+
+### 3.1 Blueprint Generator (`services/ai/blueprintGenerator.js`)
+
+```javascript
+/**
+ * @file blueprintGenerator.js
+ * @description Generate curriculum structure from course outline
+ */
+
+// ============================================
+// FUNCTION: generateBlueprint
+// ============================================
+/**
+ * Generate topics and subtopics from course outline
+ * 
+ * @param {Object} params
+ * @param {string} params.subjectName - Subject name
+ * @param {string} params.goal - Learning goal
+ * @param {string} params.outlineText - Extracted course outline
+ * 
+ * @returns {Promise<Object>} blueprint
+ * @returns {Array} blueprint.topics - Array of topics with subtopics
+ * 
+ * @example
+ * const blueprint = await generateBlueprint({
+ *   subjectName: "Machine Learning",
+ *
+
+
+ 3.1 Blueprint Generator (services/ai/blueprintGenerator.js)
+javascript/**
+ * @file blueprintGenerator.js
+ * @description Generate curriculum structure from course outline
+ */
+
+// ============================================
+// FUNCTION: generateBlueprint
+// ============================================
+/**
+ * Generate topics and subtopics from course outline
+ * 
+ * @param {Object} params
+ * @param {string} params.subjectName - Subject name
+ * @param {string} params.goal - Learning goal
+ * @param {string} params.outlineText - Extracted course outline
+ * 
+ * @returns {Promise<Object>} blueprint
+ * @returns {Array} blueprint.topics - Array of topics with subtopics
+ * 
+ * @example
+ * const blueprint = await generateBlueprint({
+ *   subjectName: "Machine Learning",
+ *   goal: "Prepare for ML Engineer interview",
+ *   outlineText: "Week 1: Linear Regression..."
+ * });
+ * 
+ * // Returns:
+ * {
+ *   topics: [
+ *     {
+ *       name: "Linear Regression",
+ *       order: 1,
+ *       description: "Introduction to supervised learning...",
+ *       difficultyLevel: "beginner",
+ *       prerequisites: [],
+ *       subtopics: [
+ *         {
+ *           name: "Simple Linear Regression",
+ *           order: 1,
+ *           description: "Single variable regression",
+ *           estimatedDuration: 30
+ *         },
+ *         {
+ *           name: "Multiple Linear Regression",
+ *           order: 2,
+ *           description: "Multiple variables...",
+ *           estimatedDuration: 45
+ *         }
+ *       ]
+ *     }
+ *   ]
+ * }
+ * 
+ * @workflow
+ * 1. Construct AI prompt with:
+ *    - Subject name and goal
+ *    - Course outline text
+ *    - Instructions for structured output
+ *    - JSON schema for expected format
+ * 
+ * 2. Call AI API (Claude or GPT-4)
+ * 
+ * 3. Parse AI response:
+ *    - Extract JSON from response
+ *    - Validate structure
+ *    - Handle parsing errors
+ * 
+ * 4. Post-process:
+ *    - Assign order numbers
+ *    - Set default values
+ *    - Identify prerequisites based on dependencies
+ * 
+ * 5. Validate:
+ *    - Check topic names are unique
+ *    - Check subtopics exist for each topic
+ *    - Verify prerequisites reference valid topics
+ * 
+ * 6. Return structured blueprint
+ * 
+ * @aiPrompt
+ * ```
+ * You are an expert curriculum designer. Create a comprehensive learning path.
+ * 
+ * Subject: {subjectName}
+ * Goal: {goal}
+ * 
+ * Course Outline:
+ * {outlineText}
+ * 
+ * Generate a structured curriculum with:
+ * 1. Main topics (5-10 topics covering the subject)
+ * 2. Subtopics under each topic (3-7 subtopics per topic)
+ * 3. Prerequisites for each topic (topic names that must be completed first)
+ * 4. Difficulty level (beginner/intermediate/advanced)
+ * 5. Estimated duration in minutes for each subtopic
+ * 
+ * Return ONLY valid JSON in this exact format:
+ * {
+ *   "topics": [
+ *     {
+ *       "name": "Topic Name",
+ *       "description": "Brief description",
+ *       "difficultyLevel": "beginner",
+ *       "prerequisites": ["Previous Topic Name"],
+ *       "subtopics": [
+ *         {
+ *           "name": "Subtopic Name",
+ *           "description": "Brief description",
+ *           "estimatedDuration": 30
+ *         }
+ *       ]
+ *     }
+ *   ]
+ * }
+ * 
+ * Rules:
+ * - First topic should have no prerequisites
+ * - Prerequisites must reference existing topic names
+ * - Each topic should have 3-7 subtopics
+ * - Subtopics should be ordered logically
+ * - Duration should be realistic (20-60 minutes)
+ * ```
+ * 
+ * @errors
+ * - Throws if AI API fails
+ * - Throws if response is not valid JSON
+ * - Throws if structure doesn't match schema
+ */
+exports.generateBlueprint = async ({ subjectName, goal, outlineText }) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: validateBlueprint
+// ============================================
+/**
+ * Validate blueprint structure
+ * 
+ * @param {Object} blueprint
+ * @returns {Object} validationResult
+ * @returns {boolean} validationResult.isValid
+ * @returns {Array} validationResult.errors
+ */
+exports.validateBlueprint = (blueprint) => {
+  // Implementation here
+};
+
+3.2 Content Generator (services/ai/contentGenerator.js)
+javascript/**
+ * @file contentGenerator.js
+ * @description Generate learning content for different steps
+ */
+
+// ============================================
+// FUNCTION: generateContent
+// ============================================
+/**
+ * Generate learning content based on step type
+ * 
+ * @param {Object} params
+ * @param {Object} params.subtopic - Subtopic object
+ * @param {Object} params.topic - Topic object
+ * @param {string} params.step - 'introduction' | 'understanding' | 'mastering'
+ * @param {Object} params.context - Built context object
+ * @param {string} params.context.coreIntuition - Core intuition for topic
+ * @param {Array} params.context.completedTopics - Summaries of completed topics
+ * @param {Array} params.context.keyConcepts - Relevant concepts learned
+ * 
+ * @returns {Promise<Object>} result
+ * @returns {string} result.content - Generated content (Markdown)
+ * @returns {Array} result.referencedTopics - Topic IDs referenced
+ * @returns {Array} result.referencedSubtopics - Subtopic IDs referenced
+ * 
+ * @example
+ * const result = await generateContent({
+ *   subtopic: { name: "Eigenvalues", description: "..." },
+ *   topic: { name: "Linear Algebra" },
+ *   step: "introduction",
+ *   context: {
+ *     coreIntuition: "Linear transformations...",
+ *     completedTopics: [...],
+ *     keyConcepts: [...]
+ *   }
+ * });
+ * 
+ * @workflow
+ * 1. Select appropriate prompt template based on step:
+ *    - introduction: Focus on "what" and "why"
+ *    - understanding: Focus on "how" with detailed explanation
+ *    - mastering: Focus on application, examples, edge cases
+ * 
+ * 2. Build comprehensive prompt:
+ *    - Include core intuition
+ *    - Include relevant previous learnings
+ *    - Include specific instructions for step type
+ *    - Include subtopic details
+ * 
+ * 3. Call AI API with prompt
+ * 
+ * 4. Post-process response:
+ *    - Format as Markdown
+ *    - Extract referenced topics/subtopics
+ *    - Validate content length (min 500 words)
+ * 
+ * 5. Return structured result
+ * 
+ * @stepPrompts
+ * 
+ * INTRODUCTION:
+ * ```
+ * You are an expert teacher creating introductory content.
+ * 
+ * Topic: {topicName}
+ * Subtopic: {subtopicName}
+ * Description: {subtopicDescription}
+ * 
+ * Core Intuition for this topic:
+ * {coreIntuition}
+ * 
+ * Student has already learned:
+ * {completedTopicsSummaries}
+ * 
+ * Key concepts the student knows:
+ * {keyConceptsList}
+ * 
+ * Create introductory content that:
+ * 1. Explains WHAT this subtopic is about
+ * 2. Explains WHY it's important and relevant
+ * 3. Builds intuition before diving into details
+ * 4. Uses analogies and real-world examples
+ * 5. Connects to what the student already knows
+ * 6. Prepares them for deeper understanding
+ * 
+ * Guidelines:
+ * - Start with the big picture
+ * - Use simple language
+ * - Include 2-3 analogies
+ * - Length: 800-1200 words
+ * - Format in Markdown with proper headings
+ * - No complex math yet - save for understanding phase
+ * 
+ * Return ONLY the content, no preamble.
+ * ```
+ * 
+ * UNDERSTANDING:
+ * ```
+ * You are an expert teacher creating detailed explanatory content.
+ * 
+ * [Same context as above]
+ * 
+ * The student has completed the introduction and understands the basics.
+ * 
+ * Create detailed understanding content that:
+ * 1. Explains HOW this works in detail
+ * 2. Provides step-by-step explanations
+ * 3. Includes mathematical formulations (if applicable)
+ * 4. Shows the reasoning and derivations
+ * 5. Uses visual descriptions and diagrams
+ * 6. Provides 2-3 worked examples
+ * 
+ * Guidelines:
+ * - Be thorough and detailed
+ * - Break down complex ideas
+ * - Show all steps in examples
+ * - Length: 1200-1800 words
+ * - Format in Markdown
+ * - Include code examples if relevant
+ * 
+ * Return ONLY the content.
+ * ```
+ * 
+ * MASTERING:
+ * ```
+ * You are an expert teacher creating mastery-level content.
+ * 
+ * [Same context]
+ * 
+ * The student understands the concept. Now help them master it.
+ * 
+ * Create mastery content that:
+ * 1. Shows practical applications
+ * 2. Discusses edge cases and limitations
+ * 3. Provides challenging practice problems
+ * 4. Explains common mistakes
+ * 5. Shows advanced techniques
+ * 6. Connects to broader context
+ * 
+ * Guidelines:
+ * - Focus on application
+ * - Include 3-4 challenging examples
+ * - Discuss when to use vs not use
+ * - Length: 1000-1500 words
+ * - Format in Markdown
+ * - Include practice exercises
+ * 
+ * Return ONLY the content.
+ * ```
+ */
+exports.generateContent = async ({ subtopic, topic, step, context }) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: getPromptForStep
+// ============================================
+/**
+ * Get appropriate prompt template for step type
+ * 
+ * @param {string} step
+ * @param {Object} data
+ * @returns {string} prompt
+ */
+exports.getPromptForStep = (step, data) => {
+  // Implementation here
+};
+
+3.3 Intuition Generator (services/ai/intuitionGenerator.js)
+javascript/**
+ * @file intuitionGenerator.js
+ * @description Generate core intuition for topics
+ */
+
+// ============================================
+// FUNCTION: generateIntuition
+// ============================================
+/**
+ * Generate core intuition/mental model for a topic
+ * 
+ * @param {Object} params
+ * @param {string} params.topicName
+ * @param {string} params.description
+ * @param {string} params.subjectName
+ * @param {Array} params.subtopics - List of subtopic names
+ * 
+ * @returns {Promise<string>} coreIntuition
+ * 
+ * @example
+ * const intuition = await generateIntuition({
+ *   topicName: "Eigenvectors and Eigenvalues",
+ *   description: "Special vectors in linear transformations",
+ *   subjectName: "Linear Algebra",
+ *   subtopics: ["Definition", "Computation", "Applications"]
+ * });
+ * 
+ * // Returns:
+ * "Eigenvectors are special directions that don't change direction 
+ * when a transformation is applied - they only stretch or shrink. 
+ * Think of them as the 'natural axes' of a transformation..."
+ * 
+ * @workflow
+ * 1. Build prompt with topic context
+ * 2. Call AI to generate fundamental understanding
+ * 3. Validate response (200-400 words)
+ * 4. Return intuition text
+ * 
+ * @aiPrompt
+ * ```
+ * You are an expert teacher creating foundational understanding.
+ * 
+ * Subject: {subjectName}
+ * Topic: {topicName}
+ * Description: {description}
+ * 
+ * This topic covers:
+ * {subtopicsList}
+ * 
+ * Generate a core intuition that:
+ * 1. Explains the fundamental idea in simple terms
+ * 2. Provides a memorable mental model or analogy
+ * 3. Captures the essence of the topic
+ * 4. Will be used as context for all subtopic learning
+ * 
+ * Guidelines:
+ * - Use simple, clear language
+ * - Focus on the "aha!" moment
+ * - Length: 200-400 words
+ * - One powerful analogy
+ * - No technical jargon yet
+ * 
+ * This intuition will be shown to the student before every subtopic,
+ * so make it memorable and foundational.
+ * 
+ * Return ONLY the intuition text, no formatting or preamble.
+ * ```
+ */
+exports.generateIntuition = async ({ topicName, description, subjectName, subtopics }) => {
+  // Implementation here
+};
+
+3.4 Summary Generator (services/ai/summaryGenerator.js)
+javascript/**
+ * @file summaryGenerator.js
+ * @description Generate concise summaries for context efficiency
+ */
+
+// ============================================
+// FUNCTION: generateSubtopicSummary
+// ============================================
+/**
+ * Generate summary of what was learned in a subtopic
+ * 
+ * @param {Object} params
+ * @param {string} params.subtopicName
+ * @param {string} params.introContent - Introduction content
+ * @param {string} params.understandingContent - Understanding content
+ * @param {string} params.masteringContent - Mastering content
+ * 
+ * @returns {Promise<Object>} summary
+ * @returns {string} summary.summaryText - Concise summary
+ * @returns {Array} summary.keyPoints - 3-5 bullet points
+ * 
+ * @workflow
+ * 1. Combine all content for subtopic
+ * 2. Call AI to generate concise summary
+ * 3. Extract key points
+ * 4. Return structured summary
+ * 
+ * @aiPrompt
+ * ```
+ * Summarize what the student learned in this subtopic.
+ * 
+ * Subtopic: {subtopicName}
+ * 
+ * Content covered:
+ * {allContent}
+ * 
+ * Create a concise summary that:
+ * 1. Captures the main concepts learned
+ * 2. Will be used as context for future learning
+ * 3. Is brief but complete
+ * 
+ * Return JSON:
+ * {
+ *   "summaryText": "150-200 word summary",
+ *   "keyPoints": ["Point 1", "Point 2", "Point 3"]
+ * }
+ * ```
+ */
+exports.generateSubtopicSummary = async ({ subtopicName, introContent, understandingContent, masteringContent }) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: generateTopicSummary
+// ============================================
+/**
+ * Generate overall summary for a completed topic
+ * 
+ * @param {Object} params
+ * @param {string} params.topicName
+ * @param {Array} params.subtopicSummaries - Summaries of all subtopics
+ * 
+ * @returns {Promise<Object>} summary
+ */
+exports.generateTopicSummary = async ({ topicName, subtopicSummaries }) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: generateInBackground
+// ============================================
+/**
+ * Queue summary generation as background job
+ * 
+ * @param {number} subtopicId
+ * @returns {Promise<void>}
+ */
+exports.generateInBackground = async (subtopicId) => {
+  // Add to job queue
+  // Will be processed by background worker
+};
+
+3.5 Question Answerer (services/ai/questionAnswerer.js)
+javascript/**
+ * @file questionAnswerer.js
+ * @description Answer user questions based on learned content
+ */
+
+// ============================================
+// FUNCTION: answerQuestion
+// ============================================
+/**
+ * Answer user's question using learned context
+ * 
+ * @param {Object} params
+ * @param {string} params.question - User's question
+ * @param {number} params.sessionId
+ * @param {number} [params.subtopicId] - Current subtopic context
+ * 
+ * @returns {Promise<Object>} result
+ * @returns {string} result.answer
+ * @returns {Array} result.contextUsed - What was used to answer
+ * 
+ * @workflow
+ * 1. Analyze question to identify relevant topics
+ * 2. Build context from learned content:
+ *    - Get summaries of relevant topics
+ *    - Get relevant concepts
+ *    - Include current subtopic context if provided
+ * 3. Call AI with question + context
+ * 4. Track what context was used
+ * 5. Return answer
+ * 
+ * @aiPrompt
+ * ```
+ * You are a tutor helping a student with their question.
+ * 
+ * The student is studying: {subjectName}
+ * Current topic: {currentTopic} (if applicable)
+ * 
+ * What the student has learned so far:
+ * {learnedTopicsSummaries}
+ * 
+ * Key concepts the student knows:
+ * {conceptsList}
+ * 
+ * Student's question:
+ * {question}
+ * 
+ * Answer the question:
+ * 1. Based on what they've already learned
+ * 2. Using language consistent with previous content
+ * 3. Building on their existing knowledge
+ * 4. If the question is about something not yet covered, gently indicate that
+ * 5. If they seem confused about something covered, clarify patiently
+ * 
+ * Keep answer clear and focused (300-600 words).
+ * 
+ * Return ONLY the answer, no preamble.
+ * ```
+ */
+exports.answerQuestion = async ({ question, sessionId, subtopicId }) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: analyzeQuestion
+// ============================================
+/**
+ * Analyze question to identify relevant topics
+ * 
+ * @param {string} question
+ * @param {number} sessionId
+ * @returns {Promise<Array>} relevantTopicIds
+ */
+exports.analyzeQuestion = async (question, sessionId) => {
+  // Use simple keyword matching or AI to identify topics
+  // Implementation here
+};
+
+3.6 Context Builder (services/context/contextBuilder.js)
+javascript/**
+ * @file contextBuilder.js
+ * @description Build optimized context for AI generation
+ */
+
+// ============================================
+// FUNCTION: buildContextForContent
+// ============================================
+/**
+ * Build context for content generation
+ * 
+ * @param {Object} params
+ * @param {number} params.sessionId
+ * @param {number} params.topicId
+ * @param {number} params.subtopicId
+ * @param {string} params.step
+ * 
+ * @returns {Promise<Object>} context
+ * @returns {string} context.coreIntuition
+ * @returns {Array} context.completedTopics
+ * @returns {Array} context.completedSubtopics
+ * @returns {Array} context.keyConcepts
+ * 
+ * @workflow
+ * 1. Get core intuition for current topic
+ * 2. Get prerequisite topics:
+ *    - Fetch prerequisites list from current topic
+ *    - Get summaries for each prerequisite topic
+ * 3. Get completed subtopics in current topic:
+ *    - Only subtopics before current one
+ *    - Get their summaries
+ * 4. Get relevant concepts:
+ *    - Get recent concepts (limit 20)
+ *    - Prioritize high importance
+ *    - From current topic and prerequisites
+ * 5. Format context for AI prompt
+ * 6. Cache result for 30 minutes
+ * 7. Return structured context
+ * 
+ * @example
+ * const context = await buildContextForContent({
+ *   sessionId: 1,
+ *   topicId: 3,
+ *   subtopicId: 8,
+ *   step: 'understanding'
+ * });
+ * 
+ * // Returns:
+ * {
+ *   coreIntuition: "Eigenvectors are special directions...",
+ *   completedTopics: [
+ *     {
+ *       name: "Linear Transformations",
+ *       summary: "We learned that transformations..."
+ *     }
+ *   ],
+ *   completedSubtopics: [
+ *     {
+ *       name: "Definition of Eigenvectors",
+ *       summary: "An eigenvector is..."
+ *     }
+ *   ],
+ *   keyConcepts: [
+ *     {
+ *       name: "Matrix multiplication",
+ *       explanation: "..."
+ *     }
+ *   ]
+ * }
+ */
+exports.buildContextForContent = async ({ sessionId, topicId, subtopicId, step }) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: buildContextForQuestion
+// ============================================
+/**
+ * Build context for answering questions
+ * 
+ * @param {Object} params
+ * @param {number} params.sessionId
+ * @param {string} params.question
+ * @param {Array} params.relevantTopicIds
+ * 
+ * @returns {Promise<Object>} context
+ */
+exports.buildContextForQuestion = async ({ sessionId, question, relevantTopicIds }) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: formatContextForPrompt
+// ============================================
+/**
+ * Format context object into string for AI prompt
+ * 
+ * @param {Object} context
+ * @returns {string} formattedContext
+ */
+exports.formatContextForPrompt = (context) => {
+  // Convert context object to readable string format
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: getCachedContext
+// ============================================
+/**
+ * Get cached context if available
+ * 
+ * @param {string} cacheKey
+ * @returns {Promise<Object|null>} cachedContext
+ */
+exports.getCachedContext = async (cacheKey) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: cacheContext
+// ============================================
+/**
+ * Cache context for future use
+ * 
+ * @param {string} cacheKey
+ * @param {Object} context
+ * @param {number} ttlMinutes
+ * @returns {Promise<void>}
+ */
+exports.cacheContext = async (cacheKey, context, ttlMinutes = 30) => {
+  // Implementation here
+};
+
+3.7 Concept Extractor (services/context/conceptExtractor.js)
+javascript/**
+ * @file conceptExtractor.js
+ * @description Extract key concepts from generated content
+ */
+
+// ============================================
+// FUNCTION: extractConcepts
+// ============================================
+/**
+ * Extract key concepts from learning content
+ * 
+ * @param {Object} params
+ * @param {string} params.content - Generated content text
+ * @param {number} params.subtopicId
+ * @param {number} params.sessionId
+ * 
+ * @returns {Promise<Array>} concepts
+ * @returns {string} concepts[].name
+ * @returns {string} concepts[].explanation
+ * @returns {string} concepts[].importance
+ * 
+ * @workflow
+ * 1. Call AI to extract key concepts from content
+ * 2. Parse response into structured format
+ * 3. Save concepts to ConceptMap model
+ * 4. Return extracted concepts
+ * 
+ * @aiPrompt
+ * ```
+ * Extract the key concepts from this learning content.
+ * 
+ * Content:
+ * {content}
+ * 
+ * Identify 3-7 key concepts that:
+ * 1. Are central to understanding this material
+ * 2. Will be useful as context for future learning
+ * 3. Represent new knowledge gained
+ * 
+ * For each concept, provide:
+ * - Name (short, 2-5 words)
+ * - Brief explanation (1-2 sentences)
+ * - Importance (high/medium/low)
+ * 
+ * Return JSON:
+ * {
+ *   "concepts": [
+ *     {
+ *       "name": "Concept name",
+ *       "explanation": "Brief explanation",
+ *       "importance": "high"
+ *     }
+ *   ]
+ * }
+ * ```
+ */
+exports.extractConcepts = async ({ content, subtopicId, sessionId }) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: extractConceptsInBackground
+// ============================================
+/**
+ * Queue concept extraction as background job
+ * 
+ * @param {number} contentId
+ * @returns {Promise<void>}
+ */
+exports.extractConceptsInBackground = async (contentId) => {
+  // Add to job queue
+};
+
+3.8 File Services
+javascript/**
+ * @file services/file/pdfExtractor.js
+ * @description Extract text from PDF files
+ */
+
+// ============================================
+// FUNCTION: extractTextFromPDF
+// ============================================
+/**
+ * Extract text content from PDF
+ * 
+ * @param {Buffer|string} input - PDF buffer or file path
+ * @returns {Promise<string>} extractedText
+ * 
+ * @workflow
+ * 1. Load PDF using pdf-parse
+ * 2. Extract text from all pages
+ * 3. Clean extracted text:
+ *    - Remove excessive whitespace
+ *    - Fix line breaks
+ *    - Handle tables and special characters
+ * 4. Return clean text
+ * 
+ * @errors
+ * - Throws if PDF is password protected
+ * - Throws if PDF is corrupted
+ * - Returns empty string if no text found
+ */
+exports.extractTextFromPDF = async (input) => {
+  const pdfParse = require('pdf-parse');
+  
+  try {
+    let dataBuffer;
+    
+    if (Buffer.isBuffer(input)) {
+      dataBuffer = input;
+    } else {
+      // If file path provided
+      const fs = require('fs').promises;
+      dataBuffer = await fs.readFile(input);
+    }
+    
+    const data = await pdfParse(dataBuffer);
+    
+    // Clean the text
+    let text = data.text;
+    text = text.replace(/\s+/g, ' '); // Normalize whitespace
+    text = text.replace(/\n{3,}/g, '\n\n'); // Max 2 line breaks
+    text = text.trim();
+    
+    return text;
+  } catch (error) {
+    throw new Error(`PDF extraction failed: ${error.message}`);
+  }
+};
+
+/**
+ * @file services/file/docxExtractor.js
+ */
+
+// ============================================
+// FUNCTION: extractTextFromDOCX
+// ============================================
+/**
+ * Extract text from Word document
+ * 
+ * @param {Buffer|string} input
+ * @returns {Promise<string>} extractedText
+ */
+exports.extractTextFromDOCX = async (input) => {
+  const mammoth = require('mammoth');
+  
+  try {
+    const result = await mammoth.extractRawText({ path: input });
+    
+    let text = result.value;
+    text = text.replace(/\s+/g, ' ');
+    text = text.trim();
+    
+    return text;
+  } catch (error) {
+    throw new Error(`DOCX extraction failed: ${error.message}`);
+  }
+};
+
+/**
+ * @file services/file/imageExtractor.js
+ */
+
+// ============================================
+// FUNCTION: extractTextFromImage
+// ============================================
+/**
+ * Extract text from image using OCR
+ * 
+ * @param {string} imagePath
+ * @returns {Promise<string>} extractedText
+ */
+exports.extractTextFromImage = async (imagePath) => {
+  const Tesseract = require('tesseract.js');
+  
+  try {
+    const { data: { text } } = await Tesseract.recognize(
+      imagePath,
+      'eng',
+      {
+        logger: m => console.log(m) // Progress logging
+      }
+    );
+    
+    let cleanText = text;
+    cleanText = cleanText.replace(/\s+/g, ' ');
+    cleanText = cleanText.trim();
+    
+    return cleanText;
+  } catch (error) {
+    throw new Error(`Image OCR failed: ${error.message}`);
+  }
+};
+
+3.9 Progress Tracker (services/progress/progressTracker.js)
+javascript/**
+ * @file progressTracker.js
+ * @description Track and manage learning progress
+ */
+
+// ============================================
+// FUNCTION: markStepComplete
+// ============================================
+/**
+ * Mark a learning step as completed
+ * 
+ * @param {Object} params
+ * @param {number} params.subtopicId
+ * @param {string} params.step - 'introduction' | 'understanding' | 'mastering'
+ * 
+ * @returns {Promise<Object>} result
+ * @returns {Object} result.progress - Updated progress
+ * @returns {string} result.nextStep - Next step to work on
+ * @returns {boolean} result.subtopicCompleted
+ * @returns {boolean} result.topicCompleted
+ * 
+ * @workflow
+ * 1. Get or create progress record
+ * 2. Update completion flags based on step
+ * 3. Set timestamp for step completion
+ * 4. Move current_step to next step
+ * 5. If mastering completed:
+ *    - Mark subtopic as completed
+ *    - Queue summary generation job
+ *    - Check if all subtopics in topic are complete
+ *    - If yes, mark topic as complete
+ * 6. Invalidate cached context
+ * 7. Return updated progress
+ */
+exports.markStepComplete = async ({ subtopicId, step }) => {
+  // Implementation here
+};
+
+// ============================================
+// FUNCTION: getSessionProgress
+// ============================================
+/**
+ * Get overall progress for a session
+ * 
+ * @param {number} sessionId
+ * @returns {Promise<Object>} stats
+ */
+exports.getSessionProgress = async (sessionId) => {
+  const { Subtopic, SubtopicProgress, Topic } = require('../../models');
+  
+  // Get all subtopics for session
+  const subtopics = await Subtopic.findAll({
+    include: [{
+      model: Topic,
+      where: { session_id: sessionId },
+      attributes: ['id', 'name']
+    }, {
+      model: SubtopicProgress,
+      required: false
+    }]
+  });
+  
+  const stats = {
+    total: subtopics.length,
+    notStarted: 0,
+    introduction: 0,
+    understanding: 0,
+    mastering: 0,
+    completed: 0,
+    completionPercentage: 0
+  };
+  
+  subtopics.forEach(st => {
+    if (!st.progress) {
+      stats.notStarted++;
+    } else {
+      stats[st.progress.current_step]++;
+    }
+  });
+  
+  stats.completionPercentage = Math.round(
+    (stats.completed / stats.total) * 100
+  );
+  
+  return stats;
+};
+
+// ============================================
+//
+
+3.10 Progress Analyzer (services/progress/progressAnalyzer.js)
+javascript/**
+ * @file progressAnalyzer.js
+ * @description Analyze learning patterns and provide insights
+ */
+
+// ============================================
+// FUNCTION: getAnalytics
+// ============================================
+/**
+ * Get detailed learning analytics
+ * 
+ * @param {number} sessionId
+ * @returns {Promise<Object>} analytics
+ * 
+ * @workflow
+ * 1. Calculate completion metrics
+ * 2. Calculate time metrics
+ * 3. Analyze learning velocity
+ * 4. Calculate estimated time remaining
+ * 5. Identify areas of strength/weakness
+ * 6. Return comprehensive analytics
+ */
+exports.getAnalytics = async (sessionId) => {
+  const { SubtopicProgress, Subtopic, Topic, UserQuestion } = require('../../models');
+  
+  // Get all progress records
+  const progressRecords = await SubtopicProgress.findAll({
+    include: [{
+      model: Subtopic,
+      include: [{
+        model: Topic,
+        where: { session_id: sessionId }
+      }]
+    }]
+  });
+  
+  const analytics = {
+    completionMetrics: {
+      totalSubtopics: 0,
+      completed: 0,
+      inProgress: 0,
+      notStarted: 0,
+      percentage: 0
+    },
+    timeMetrics: {
+      totalTimeSpent: 0,
+      averageTimePerStep: {},
+      averageTimePerSubtopic: 0
+    },
+    learningVelocity: {
+      subtopicsPerWeek: 0,
+      estimatedCompletionDate: null
+    },
+    engagement: {
+      totalQuestions: 0,
+      questionsPerSubtopic: 0
+    },
+    strengths: [],
+    needsImprovement: []
+  };
+  
+  // Calculate metrics
+  progressRecords.forEach(progress => {
+    analytics.completionMetrics.totalSubtopics++;
+    
+    if (progress.current_step === 'completed') {
+      analytics.completionMetrics.completed++;
+      
+      // Calculate time spent
+      if (progress.started_at && progress.mastering_completed_at) {
+        const timeSpent = new Date(progress.mastering_completed_at) - new Date(progress.started_at);
+        analytics.timeMetrics.totalTimeSpent += timeSpent;
+      }
+    } else if (progress.current_step !== 'not_started') {
+      analytics.completionMetrics.inProgress++;
+    } else {
+      analytics.completionMetrics.notStarted++;
+    }
+  });
+  
+  analytics.completionMetrics.percentage = Math.round(
+    (analytics.completionMetrics.completed / analytics.completionMetrics.totalSubtopics) * 100
+  );
+  
+  // Get question count
+  const questionCount = await UserQuestion.count({
+    where: { session_id: sessionId }
+  });
+  analytics.engagement.totalQuestions = questionCount;
+  analytics.engagement.questionsPerSubtopic = 
+    analytics.completionMetrics.completed > 0 
+      ? (questionCount / analytics.completionMetrics.completed).toFixed(1)
+      : 0;
+  
+  return analytics;
+};
+
+// ============================================
+// FUNCTION: identifyStrengthsAndWeaknesses
+// ============================================
+/**
+ * Identify topics the user is doing well/struggling with
+ * 
+ * @param {number} sessionId
+ * @returns {Promise<Object>} analysis
+ */
+exports.identifyStrengthsAndWeaknesses = async (sessionId) => {
+  // Analyze based on:
+  // - Time spent on each topic
+  // - Number of questions asked
+  // - Regeneration requests
+  
+  // Implementation here
+};
+
+4. API Request/Response Formats
+Standard Response Format
+javascript// Success Response
+{
+  "success": true,
+  "data": {
+    // Response data here
+  },
+  "message": "Optional success message"
+}
+
+// Error Response
+{
+  "success": false,
+  "error": {
+    "message": "Error message",
+    "code": "ERROR_CODE",
+    "details": {} // Optional additional details
+  }
+}
+
+// Paginated Response
+{
+  "success": true,
+  "data": {
+    "items": [...],
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 50,
+      "totalPages": 5,
+      "hasNext": true,
+      "hasPrev": false
+    }
+  }
+}
+Example Request/Response Flows
+1. Complete Session Creation Flow
+javascript// Step 1: Create Session
+POST /api/sessions
+Request:
+{
+  "subjectName": "Machine Learning",
+  "goal": "Prepare for ML Engineer interview at FAANG"
+}
+
+Response (201):
+{
+  "success": true,
+  "data": {
+    "session": {
+      "id": 1,
+      "sessionId": "sess_8f3d9a1b",
+      "subjectName": "Machine Learning",
+      "goal": "Prepare for ML Engineer interview at FAANG",
+      "status": "setup",
+      "blueprintGenerated": false,
+      "createdDate": "2024-01-15T10:30:00Z"
+    }
+  }
+}
+
+// Step 2: Upload Outline
+POST /api/sessions/sess_8f3d9a1b/outline
+Request: multipart/form-data
+{
+  file: [PDF file]
+}
+
+Response (200):
+{
+  "success": true,
+  "data": {
+    "session": {
+      "id": 1,
+      "sessionId": "sess_8f3d9a1b",
+      "courseOutlineText": "Week 1: Introduction to ML\nLinear Regression...",
+      "status": "setup"
+    }
+  }
+}
+
+// Step 3: Generate Blueprint
+POST /api/sessions/sess_8f3d9a1b/generate-blueprint
+Request: {}
+
+Response (201):
+{
+  "success": true,
+  "data": {
+    "topics": [
+      {
+        "id": 1,
+        "name": "Introduction to Machine Learning",
+        "order": 1,
+        "difficultyLevel": "beginner",
+        "prerequisites": [],
+        "subtopics": [
+          {
+            "id": 1,
+            "name": "What is Machine Learning",
+            "order": 1,
+            "estimatedDuration": 30
+          },
+          {
+            "id": 2,
+            "name": "Types of ML",
+            "order": 2,
+            "estimatedDuration": 45
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "name": "Linear Regression",
+        "order": 2,
+        "difficultyLevel": "beginner",
+        "prerequisites": [1],
+        "subtopics": [...]
+      }
+    ]
+  },
+  "message": "Blueprint generated successfully"
+}
+2. Content Generation Flow
+javascript// Generate Introduction Content
+POST /api/learning/content/generate
+Request:
+{
+  "sessionId": "sess_8f3d9a1b",
+  "subtopicId": 1,
+  "step": "introduction"
+}
+
+Response (201):
+{
+  "success": true,
+  "data": {
+    "content": {
+      "id": 1,
+      "subtopicId": 1,
+      "step": "introduction",
+      "content": "# What is Machine Learning?\n\n## The Big Picture...",
+      "generatedAt": "2024-01-15T11:00:00Z"
+    }
+  }
+}
+
+// Mark Step Complete
+POST /api/learning/progress/step-complete
+Request:
+{
+  "subtopicId": 1,
+  "step": "introduction"
+}
+
+Response (200):
+{
+  "success": true,
+  "data": {
+    "progress": {
+      "id": 1,
+      "subtopicId": 1,
+      "currentStep": "understanding",
+      "introCompleted": true,
+      "introCompletedAt": "2024-01-15T11:15:00Z"
+    },
+    "nextStep": "understanding"
+  }
+}
+3. Question Flow
+javascriptPOST /api/learning/questions/ask
+Request:
+{
+  "sessionId": "sess_8f3d9a1b",
+  "subtopicId": 1,
+  "question": "Can you explain the difference between supervised and unsupervised learning with examples?"
+}
+
+Response (201):
+{
+  "success": true,
+  "data": {
+    "question": {
+      "id": 1,
+      "question": "Can you explain the difference...",
+      "answer": "Great question! Based on what you've learned...\n\n**Supervised Learning:**...",
+      "contextUsed": ["Introduction to ML", "Types of ML"],
+      "askedAt": "2024-01-15T11:30:00Z"
+    }
+  }
+}
+
+// Provide Feedback
+POST /api/learning/questions/1/feedback
+Request:
+{
+  "helpful": true
+}
+
+Response (200):
+{
+  "success": true,
+  "message": "Feedback recorded"
+}
+
+5. Error Handling Strategy
+Error Types and HTTP Status Codes
+javascript/**
+ * @file utils/errors.js
+ * @description Custom error classes
+ */
+
+class AppError extends Error {
+  constructor(message, statusCode) {
+    super(message);
+    this.statusCode = statusCode;
+    this.isOperational = true;
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+class ValidationError extends AppError {
+  constructor(message) {
+    super(message, 400);
+    this.code = 'VALIDATION_ERROR';
+  }
+}
+
+class AuthenticationError extends AppError {
+  constructor(message = 'Authentication required') {
+    super(message, 401);
+    this.code = 'AUTH_ERROR';
+  }
+}
+
+class AuthorizationError extends AppError {
+  constructor(message = 'Not authorized to access this resource') {
+    super(message, 403);
+    this.code = 'AUTHORIZATION_ERROR';
+  }
+}
+
+class NotFoundError extends AppError {
+  constructor(resource = 'Resource') {
+    super(`${resource} not found`, 404);
+    this.code = 'NOT_FOUND';
+  }
+}
+
+class ConflictError extends AppError {
+  constructor(message) {
+    super(message, 409);
+    this.code = 'CONFLICT';
+  }
+}
+
+class AIGenerationError extends AppError {
+  constructor(message = 'AI content generation failed') {
+    super(message, 500);
+    this.code = 'AI_GENERATION_ERROR';
+  }
+}
+
+module.exports = {
+  AppError,
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ConflictError,
+  AIGenerationError
+};
+Global Error Handler
+javascript/**
+ * @file middleware/errorHandler.js
+ */
+
+const { AppError } = require('../utils/errors');
+const logger = require('../utils/logger');
+
+exports.errorHandler = (err, req, res, next) => {
+  let error = { ...err };
+  error.message = err.message;
+  
+  // Log error
+  logger.error({
+    message: err.message,
+    stack: err.stack,
+    url: req.originalUrl,
+    method: req.method,
+    body: req.body,
+    user: req.user?.id
+  });
+  
+  // Sequelize validation error
+  if (err.name === 'SequelizeValidationError') {
+    const message = err.errors.map(e => e.message).join(', ');
+    error = new AppError(message, 400);
+  }
+  
+  // Sequelize unique constraint error
+  if (err.name === 'SequelizeUniqueConstraintError') {
+    const message = 'Duplicate value entered';
+    error = new AppError(message, 409);
+  }
+  
+  // JWT errors
+  if (err.name === 'JsonWebTokenError') {
+    error = new AppError('Invalid token', 401);
+  }
+  
+  if (err.name === 'TokenExpiredError') {
+    error = new AppError('Token expired', 401);
+  }
+  
+  // Send response
+  res.status(error.statusCode || 500).json({
+    success: false,
+    error: {
+      message: error.message || 'Internal server error',
+      code: error.code || 'INTERNAL_ERROR',
+      ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    }
+  });
+};
+
+// Async error wrapper
+exports.asyncHandler = (fn) => {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
+
+6. Validation Schemas
+Using Joi for Request Validation
+javascript/**
+ * @file middleware/validator.js
+ */
+
+const Joi = require('joi');
+const { ValidationError } = require('../utils/errors');
+
+// ============================================
+// Session Validation
+// ============================================
+exports.validateCreateSession = (req, res, next) => {
+  const schema = Joi.object({
+    subjectName: Joi.string()
+      .min(2)
+      .max(200)
+      .required()
+      .messages({
+        'string.empty': 'Subject name is required',
+        'string.min': 'Subject name must be at least 2 characters',
+        'string.max': 'Subject name cannot exceed 200 characters'
+      }),
+    goal: Joi.string()
+      .min(10)
+      .max(1000)
+      .required()
+      .messages({
+        'string.empty': 'Learning goal is required',
+        'string.min': 'Goal must be at least 10 characters',
+        'string.max': 'Goal cannot exceed 1000 characters'
+      })
+  });
+  
+  const { error } = schema.validate(req.body);
+  
+  if (error) {
+    throw new ValidationError(error.details[0].message);
+  }
+  
+  next();
+};
+
+// ============================================
+// Content Generation Validation
+// ============================================
+exports.validateGenerateContent = (req, res, next) => {
+  const schema = Joi.object({
+    sessionId: Joi.string()
+      .required()
+      .messages({
+        'string.empty': 'Session ID is required'
+      }),
+    subtopicId: Joi.number()
+      .integer()
+      .positive()
+      .required()
+      .messages({
+        'number.base': 'Subtopic ID must be a number',
+        'number.positive': 'Subtopic ID must be positive'
+      }),
+    step: Joi.string()
+      .valid('introduction', 'understanding', 'mastering')
+      .required()
+      .messages({
+        'any.only': 'Step must be one of: introduction, understanding, mastering'
+      })
+  });
+  
+  const { error } = schema.validate(req.body);
+  
+  if (error) {
+    throw new ValidationError(error.details[0].message);
+  }
+  
+  next();
+};
+
+// ============================================
+// Question Validation
+// ============================================
+exports.validateAskQuestion = (req, res, next) => {
+  const schema = Joi.object({
+    sessionId: Joi.string().required(),
+    subtopicId: Joi.number().integer().positive().optional(),
+    question: Joi.string()
+      .min(10)
+      .max(1000)
+      .required()
+      .messages({
+        'string.empty': 'Question cannot be empty',
+        'string.min': 'Question must be at least 10 characters',
+        'string.max': 'Question cannot exceed 1000 characters'
+      })
+  });
+  
+  const { error } = schema.validate(req.body);
+  
+  if (error) {
+    throw new ValidationError(error.details[0].message);
+  }
+  
+  next();
+};
+
+// ============================================
+// File Upload Validation
+// ============================================
+exports.validateFileUpload = (req, res, next) => {
+  if (!req.file) {
+    throw new ValidationError('File is required');
+  }
+  
+  const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png'];
+  
+  if (!allowedTypes.includes(req.file.mimetype)) {
+    throw new ValidationError('Invalid file type. Allowed: PDF, DOCX, JPG, PNG');
+  }
+  
+  const maxSize = 10 * 1024 * 1024; // 10MB
+  if (req.file.size > maxSize) {
+    throw new ValidationError('File size exceeds 10MB limit');
+  }
+  
+  next();
+};
+
+// ============================================
+// Pagination Validation
+// ============================================
+exports.validatePagination = (req, res, next) => {
+  const schema = Joi.object({
+    page: Joi.number().integer().min(1).default(1),
+    limit: Joi.number().integer().min(1).max(100).default(10),
+    sortBy: Joi.string().default('createdAt'),
+    order: Joi.string().valid('ASC', 'DESC').default('DESC')
+  });
+  
+  const { error, value } = schema.validate(req.query);
+  
+  if (error) {
+    throw new ValidationError(error.details[0].message);
+  }
+  
+  req.pagination = value;
+  next();
+};
+
+7. Testing Strategy
+Unit Tests Structure
+javascript/**
+ * @file tests/unit/services/blueprintGenerator.test.js
+ */
+
+const { generateBlueprint } = require('../../../src/services/ai/blueprintGenerator');
+
+describe('Blueprint Generator Service', () => {
+  describe('generateBlueprint', () => {
+    it('should generate valid blueprint structure', async () => {
+      const result = await generateBlueprint({
+        subjectName: 'Machine Learning',
+        goal: 'Learn fundamentals',
+        outlineText: 'Week 1: Introduction...'
+      });
+      
+      expect(result).toHaveProperty('topics');
+      expect(Array.isArray(result.topics)).toBe(true);
+      expect(result.topics.length).toBeGreaterThan(0);
+      expect(result.topics[0]).toHaveProperty('name');
+      expect(result.topics[0]).toHaveProperty('subtopics');
+    });
+    
+    it('should throw error on invalid input', async () => {
+      await expect(
+        generateBlueprint({
+          subjectName: '',
+          goal: 'Learn',
+          outlineText: ''
+        })
+      ).rejects.toThrow();
+    });
+  });
+});
+
+/**
+ * @file tests/unit/services/contextBuilder.test.js
+ */
+
+describe('Context Builder Service', () => {
+  describe('buildContextForContent', () => {
+    it('should build context with all required fields', async () => {
+      const context = await buildContextForContent({
+        sessionId: 1,
+        topicId: 1,
+        subtopicId: 1,
+        step: 'introduction'
+      });
+      
+      expect(context).toHaveProperty('coreIntuition');
+      expect(context).toHaveProperty('completedTopics');
+      expect(context).toHaveProperty('keyConcepts');
+    });
+  });
+});
+Integration Tests
+javascript/**
+ * @file tests/integration/learning.test.js
+ */
+
+const request = require('supertest');
+const app = require('../../src/app');
+
+describe('Learning API Integration', () => {
+  let authToken;
+  let sessionId;
+  let subtopicId;
+  
+  beforeAll(async () => {
+    // Create test user and get token
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({
+        name: 'Test User',
+        email: 'test@example.com',
+        password: 'Password123'
+      });
+    
+    authToken = res.body.data.token;
+  });
+  
+  describe('Complete Learning Flow', () => {
+    it('should create session', async () => {
+      const res = await request(app)
+        .post('/api/sessions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          subjectName: 'Test Subject',
+          goal: 'Test learning goal'
+        });
+      
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      sessionId = res.body.data.session.sessionId;
+    });
+    
+    it('should generate content for subtopic', async () => {
+      // Assuming blueprint is already generated
+      const res = await request(app)
+        .post('/api/learning/content/generate')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          sessionId,
+          subtopicId: 1,
+          step: 'introduction'
+        });
+      
+      expect(res.status).toBe(201);
+      expect(res.body.data.content).toHaveProperty('content');
+    });
+  });
+});
+
+8. Implementation Checklist
+Phase 1: Foundation (Week 1)
+Day 1-2: Database & Auth
+
+ Set up Sequelize with PostgreSQL
+ Create all model files
+ Define model associations
+ Run migrations
+ Implement auth controller (register, login, getMe)
+ Implement JWT middleware
+ Test authentication flow
+
+Day 3-4: Session Management
+
+ Implement sessionController.createSession
+ Implement sessionController.getAllSessions
+ Implement sessionController.getSessionById
+ Implement file upload middleware
+ Implement PDF/DOCX/Image extractors
+ Implement sessionController.uploadOutline
+ Test file upload and extraction
+
+Day 5-7: Blueprint Generation
+
+ Set up AI SDK (Anthropic/OpenAI)
+ Create prompt templates
+ Implement blueprintGenerator service
+ Implement sessionController.generateBlueprint
+ Test blueprint generation end-to-end
+ Add error handling
+
+Phase 2: Content Generation (Week 2)
+Day 8-9: Core Intuition
+
+ Implement intuitionGenerator service
+ Implement topicController.generateCoreIntuition
+ Test intuition generation
+ Add caching for intuitions
+
+Day 10-12: Content Generation
+
+ Implement contentGenerator service
+ Create prompts for all three steps
+ Implement learningController.generateContent
+ Test content generation for each step
+ Add regeneration functionality
+
+Day 13-14: Progress Tracking
+
+ Implement progressTracker service
+ Implement learningController.markStepComplete
+ Implement progress endpoints
+ Test progress flow
+
+Phase 3: Context & Concepts (Week 3)
+Day 15-17: Context Building
+
+ Implement contextBuilder service
+ Implement context caching
+ Test context building with various scenarios
+ Optimize context size
+
+Day 18-19: Concept Extraction
+
+ Implement conceptExtractor service
+ Integrate with content generation
+ Test concept extraction
+ Add background job for extraction
+
+Day 20-21: Summary Generation
+
+ Implement summaryGenerator service
+ Add background job for summaries
+ Test summary generation
+ Integrate summaries into context
+
+Phase 4: Q&A & Polish (Week 4)
+Day 22-23: Question System
+
+ Implement questionAnswerer service
+ Implement question controller
+ Test Q&A flow
+ Add feedback system
+
+Day 24-25: Analytics
+
+ Implement progressAnalyzer service
+ Implement analytics endpoints
+ Test analytics calculations
+ Add dashboard data
+
+Day 26-28: Testing & Optimization
+
+ Write unit tests for services
+ Write integration tests for API
+ Performance testing
+ Security audit
+ Documentation
+
+
+9. Key Implementation Tips
+1. Start Simple, Iterate
+
+Get basic flow working first
+Add optimizations later
+Don't over-engineer initially
+
+2. Error Handling Everywhere
+javascripttry {
+  const result = await aiService.generate(prompt);
+  return result;
+} catch (error) {
+  logger.error('AI generation failed', error);
+  throw new AIGenerationError(error.message);
+}
+3. Consistent Response Format
+javascript// utils/response.js
+exports.success = (res, data, message, statusCode = 200) => {
+  res.status(statusCode).json({
+    success: true,
+    data,
+    ...(message && { message })
+  });
+};
+
+exports.error = (res, message, statusCode = 500, code) => {
+  res.status(statusCode).json({
+    success: false,
+    error: {
+      message,
+      code
+    }
+  });
+};
+4. Use Transactions for Related Operations
+javascriptconst t = await sequelize.transaction();
+try {
+  // Create topic
+  const topic = await Topic.create(data, { transaction: t });
+  
+  // Create subtopics
+  await Subtopic.bulkCreate(subtopicsData, { transaction: t });
+  
+  await t.commit();
+} catch (error) {
+  await t.rollback();
+  throw error;
+}
+5. Background Jobs Setup
+javascript// jobs/index.js
+const cron = require('node-cron');
+
+// Run every hour
+cron.schedule('0 * * * *', async () => {
+  console.log('Running cache cleanup');
+  await cleanupExpiredCache();
+});
+
+// Run every 5 minutes
+cron.schedule('*/5 * * * *', async () => {
+  await processSummaryQueue();
+});

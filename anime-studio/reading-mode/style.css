@@ -1,0 +1,43 @@
+/* reading-mode/style.css */
+.reading-mode-container {
+  background: #f8fafc;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  padding: 32px;
+  max-width: 900px;
+  margin: 40px auto;
+  font-family: 'Inter', sans-serif;
+}
+.add-material-btn {
+  background: linear-gradient(90deg, #6a5af9 0%, #f857a6 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 28px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(106,90,249,0.12);
+  transition: background 0.2s;
+}
+.add-material-btn:hover {
+  background: linear-gradient(90deg, #f857a6 0%, #6a5af9 100%);
+}
+.pdf-viewer {
+  margin-top: 32px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+  background: #fff;
+  overflow: hidden;
+}
+.pdf-viewer iframe {
+  width: 100%;
+  height: 600px;
+  border: none;
+  border-radius: 12px;
+}
+.material-label {
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #6a5af9;
+  font-size: 1.15rem;
+}
