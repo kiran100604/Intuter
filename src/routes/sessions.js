@@ -5,7 +5,7 @@ const upload = require("../middleware/fileUpload");
 
 const router = express.Router();
 
-router.post("/", authenticate, sessionController.createSession);
+router.post("/", authenticate, upload.single("outline"), sessionController.createSession);
 router.get("/", authenticate, sessionController.getSessions);
 router.get("/:sessionId", authenticate, sessionController.getSessionDetails);
 router.put("/:sessionId", authenticate, sessionController.updateSession);
