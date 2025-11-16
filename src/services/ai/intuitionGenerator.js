@@ -1,7 +1,11 @@
-const Anthropic = require('@anthropic-ai/sdk');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { AIGenerationError } = require('../../utils/errors');
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+if (!process.env.GEMINI_API_KEY) {
+  throw new Error('GEMINI_API_KEY environment variable is required');
+}
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 exports.generateIntuition = async ({ topicName, description }) => {
   const prompt = `You are an expert educator. Given the topic "${topicName}" and its description: "${description}", generate a concise core intuition (1-2 sentences) that helps a learner grasp the essence of this topic.`;
