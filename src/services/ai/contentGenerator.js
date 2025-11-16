@@ -19,16 +19,13 @@ exports.generateContent = async ({ subtopicName, step, description }) => {
     throw new AIGenerationError('Invalid step for content generation');
   }
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2048,
-      messages: [
-        { role: 'user', content: prompt }
-      ]
-    });
-    const text = message.content[0].text.trim();
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
     if (!text) throw new AIGenerationError('No content generated');
-    return text;
+    return text.trim();
   } catch (err) {
     throw new AIGenerationError(err.message);
   }
