@@ -11,17 +11,39 @@ exports.createSession = async (req, res, next) => {
     const { subjectName, goal } = req.body;
     if (!subjectName || !goal)
       throw new ValidationError("Subject name and goal are required");
+
+    let courseOutlineFile = null;
+    let courseOutlineText = "";
+
+    // Handle file upload if provided
+    if (req.file) {
+      courseOutlineFile = req.file.path;
+
+      if (req.file.mimetype === "application/pdf") {
+        courseOutlineText = await extractTextFromPDF(req.file.path);
+      } else if (
+        req.file.mimetype ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ) {
+        courseOutlineText = await extractTextFromDOCX(req.file.path);
+      } else {
+        return error(res, "Unsupported file type. Use PDF or DOCX", 400);
+      }
+    }
+
     const session = await StudySession.create({
       userId: req.user.id,
       sessionId: `sess_${Math.random().toString(36).substr(2, 8)}`,
       subjectName,
       goal,
-      status: "setup",
+      courseOutlineFile,
+      courseOutlineText,
+      status: courseOutlineText ? "outline_ready" : "setup",
       blueprintGenerated: false,
       createdDate: new Date(),
       lastAccessed: new Date(),
     });
-    return success(res, { session }, "Session created", 201);
+    return success(res, { session }, "Session created" + (courseOutlineText ? " with outline uploaded" : ""), 201);
   } catch (err) {
     next(err);
   }
