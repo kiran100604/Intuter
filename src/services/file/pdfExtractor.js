@@ -1,4 +1,4 @@
-const pdfParse = require('pdf-parse');
+const { PDFParse } = require('pdf-parse');
 const fs = require('fs').promises;
 
 exports.extractTextFromPDF = async (input) => {
