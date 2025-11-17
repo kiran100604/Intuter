@@ -3,6 +3,108 @@ const { success, error } = require("../utils/response");
 const { generateContent } = require("../services/ai/contentGenerator");
 
 // Learning content and progress controller
+exports.generateLearningContent = async (req, res, next) => {
+  try {
+    const { subtopicId, sessionId } = req.body;
+    if (!subtopicId || !sessionId)
+      return error(res, "subtopicId and sessionId are required", 400);
+
+    const subtopic = await Subtopic.findByPk(subtopicId, {
+      include: [{
+        model: require("../models").Topic,
+        as: "topic",
+        where: { sessionId }
+      }]
+    });
+
+    if (!subtopic) return error(res, "Subtopic not found", 404);
+
+    const steps = ["introduction", "understanding", "mastering"];
+    const generatedContent = {};
+
+    // Initialize or get progress tracking
+    let progress = await SubtopicProgress.findOne({ where: { subtopicId } });
+    if (!progress) {
+      progress = await SubtopicProgress.create({
+        subtopicId,
+        currentStep: "introduction",
+        lastAccessed: new Date()
+      });
+    }
+
+    // Generate content for each step
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      progress.currentStep = step;
+      await progress.save();
+
+      // Return intermediate progress
+      if (i === 0) {
+        res.json({
+          success: true,
+          data: {
+            status: "generating",
+            currentStep: step,
+            progress: 33,
+            content: generatedContent
+          }
+        });
+      }
+
+      const contentText = await generateContent({
+        subtopicName: subtopic.name,
+        step,
+        description: subtopic.description || "",
+      });
+
+      // Store in database
+      let content = await LearningContent.findOne({
+        where: { subtopicId, step },
+      });
+      if (content) {
+        content.content = contentText;
+        content.regeneratedCount += 1;
+        content.generatedAt = new Date();
+        await content.save();
+      } else {
+        content = await LearningContent.create({
+          subtopicId,
+          step,
+          content: contentText,
+        });
+      }
+
+      generatedContent[step] = contentText;
+
+      // Send progress update
+      setTimeout(() => {
+        res.json({
+          success: true,
+          data: {
+            status: "generating",
+            currentStep: steps[i + 1] || step,
+            progress: i === 2 ? 100 : ((i + 1) * 33),
+            content: generatedContent
+          }
+        });
+      }, 1000);
+    }
+
+    // Mark as completed
+    progress.currentStep = "completed";
+    await progress.save();
+
+    return success(res, {
+      status: "completed",
+      content: generatedContent,
+      progress: 100
+    }, "Learning content generated successfully");
+
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.generateContent = async (req, res, next) => {
   try {
     const { subtopicId, step } = req.body;
