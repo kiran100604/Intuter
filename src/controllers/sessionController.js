@@ -39,12 +39,60 @@ exports.createSession = async (req, res, next) => {
       goal,
       courseOutlineFile,
       courseOutlineText,
-      status: courseOutlineText ? "outline_ready" : "setup",
+      status: courseOutlineText ? "generating_blueprint" : "setup",
       blueprintGenerated: false,
       createdDate: new Date(),
       lastAccessed: new Date(),
     });
-    return success(res, { session }, "Session created" + (courseOutlineText ? " with outline uploaded" : ""), 201);
+
+    // Auto-generate blueprint if PDF content is available
+    if (courseOutlineText) {
+      try {
+        const blueprint = await generateBlueprint({
+          subjectName: session.subjectName,
+          goal: session.goal,
+          outlineText: session.courseOutlineText,
+        });
+
+        // Save topics and subtopics
+        for (const topicData of blueprint.topics) {
+          const topic = await Topic.create({
+            sessionId: session.id,
+            name: topicData.name,
+            description: topicData.description,
+            prerequisites: topicData.prerequisites,
+            difficultyLevel: topicData.difficultyLevel,
+          });
+          for (const subtopicData of topicData.subtopics) {
+            await Subtopic.create({
+              topicId: topic.id,
+              name: subtopicData.name,
+              description: subtopicData.description,
+              estimatedDuration: subtopicData.estimatedDuration,
+            });
+          }
+        }
+
+        session.blueprintGenerated = true;
+        session.status = "ready";
+        await session.save();
+
+        return success(res, {
+          session: {
+            ...session.toJSON(),
+            topicCount: blueprint.topics.length,
+            subtopicCount: blueprint.topics.reduce((sum, topic) => sum + topic.subtopics.length, 0)
+          }
+        }, "Session created and topics generated successfully", 201);
+      } catch (blueprintError) {
+        console.error('Blueprint generation failed:', blueprintError);
+        session.status = "outline_ready";
+        await session.save();
+        return success(res, { session, error: "Topic generation failed, you can try again later" }, "Session created with outline uploaded", 201);
+      }
+    }
+
+    return success(res, { session }, "Session created", 201);
   } catch (err) {
     next(err);
   }
