@@ -10,26 +10,15 @@ exports.extractTextFromPDF = async (input) => {
       dataBuffer = await fs.readFile(input);
     }
 
-    // Try the original approach first
-    try {
-      const data = await pdfParse(dataBuffer);
-      let text = data.text;
-      text = text.replace(/\s+/g, ' ');
-      text = text.replace(/\n{3,}/g, '\n\n');
-      text = text.trim();
-      return text;
-    } catch (parseError) {
-      // If original fails, try class-based approach
-      const { PDFParse } = require('pdf-parse');
-      const parser = new PDFParse();
-      const data = await parser.parseBuffer(dataBuffer);
-      let text = data.text;
-      text = text.replace(/\s+/g, ' ');
-      text = text.replace(/\n{3,}/g, '\n\n');
-      text = text.trim();
-      return text;
-    }
+    const data = await pdfParse(dataBuffer);
+    let text = data.text;
+    text = text.replace(/\s+/g, ' ');
+    text = text.replace(/\n{3,}/g, '\n\n');
+    text = text.trim();
+
+    return text;
   } catch (error) {
+    console.error('PDF extraction error:', error);
     throw new Error(`PDF extraction failed: ${error.message}`);
   }
 };
