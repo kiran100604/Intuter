@@ -200,7 +200,6 @@ exports.uploadOutline = async (req, res, next) => {
   }
 };
 
-const { Topic, Subtopic } = require("../models");
 exports.generateBlueprint = async (req, res, next) => {
   try {
     const { sessionId } = req.params;
