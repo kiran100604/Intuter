@@ -200,7 +200,6 @@ exports.uploadOutline = async (req, res, next) => {
   }
 };
 
-const { generateBlueprint } = require("../services/ai/blueprintGenerator");
 const { Topic, Subtopic } = require("../models");
 exports.generateBlueprint = async (req, res, next) => {
   try {
