@@ -541,6 +541,224 @@ function showSubtopicLearningContent(subtopicItem) {
   });
 }
 
+// Start learning content generation
+async function startLearningContentGeneration(subtopicId, subtopicName) {
+  const token = localStorage.getItem('token');
+  const sessionId = localStorage.getItem('sessionId');
+
+  if (!token || !sessionId) {
+    showErrorMessage('Please log in and select a session first');
+    return;
+  }
+
+  // Hide the start learning button and show progress
+  const startBtn = document.getElementById('startLearningBtn');
+  const learningContent = document.getElementById('learningContent');
+
+  if (startBtn) {
+    startBtn.style.display = 'none';
+  }
+
+  if (learningContent) {
+    learningContent.style.display = 'block';
+    learningContent.innerHTML = `
+      <div class="content-generation-progress">
+        <h3>Generating Learning Content</h3>
+        <div class="step-indicators">
+          <div class="step" id="step-introduction">
+            <div class="step-circle">1</div>
+            <span>Introduction</span>
+          </div>
+          <div class="step" id="step-understanding">
+            <div class="step-circle">2</div>
+            <span>Understanding</span>
+          </div>
+          <div class="step" id="step-mastering">
+            <div class="step-circle">3</div>
+            <span>Mastering</span>
+          </div>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-content" id="contentProgress"></div>
+        </div>
+        <p class="progress-text" id="progressText">Initializing...</p>
+      </div>
+    `;
+  }
+
+  try {
+    // Start content generation
+    const response = await fetch('http://localhost:5000/api/learning/content/generate-learning', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        subtopicId,
+        sessionId
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to start content generation');
+    }
+
+    // Start polling for progress
+    pollContentGenerationProgress(subtopicId, subtopicName);
+
+  } catch (error) {
+    console.error('Error starting content generation:', error);
+    showErrorMessage(`Error: ${error.message}`);
+
+    // Restore the start button on error
+    if (startBtn) {
+      startBtn.style.display = 'block';
+    }
+    if (learningContent) {
+      learningContent.style.display = 'none';
+    }
+  }
+}
+
+// Poll content generation progress
+async function pollContentGenerationProgress(subtopicId, subtopicName) {
+  const token = localStorage.getItem('token');
+  let attempts = 0;
+  const maxAttempts = 120; // 4 minutes with 2-second intervals
+
+  const updateStepProgress = (currentStep, progress) => {
+    const steps = ['introduction', 'understanding', 'mastering'];
+    const stepIndex = steps.indexOf(currentStep.replace('generating_', ''));
+
+    steps.forEach((step, index) => {
+      const stepElement = document.getElementById(`step-${step}`);
+      if (stepElement) {
+        const circle = stepElement.querySelector('.step-circle');
+
+        if (index < stepIndex) {
+          stepElement.classList.add('completed');
+          circle.textContent = '✓';
+        } else if (index === stepIndex) {
+          stepElement.classList.add('active');
+        }
+      }
+    });
+
+    const progressBar = document.getElementById('contentProgress');
+    const progressText = document.getElementById('progressText');
+
+    if (progressBar) progressBar.style.width = `${progress}%`;
+    if (progressText) {
+      const stepText = stepIndex === 0 ? 'Introduction' :
+                      stepIndex === 1 ? 'Understanding' : 'Mastering';
+      progressText.textContent = `Generating ${stepText}...`;
+    }
+  };
+
+  const poll = async () => {
+    try {
+      attempts++;
+
+      const response = await fetch(
+        `http://localhost:5000/api/learning/progress/${subtopicId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+
+        updateStepProgress(data.currentStep, data.progress);
+
+        if (data.status === 'completed' && data.content) {
+          // Show completed content
+          displayGeneratedContent(data.content, subtopicName);
+          return;
+        }
+
+        if (data.status === 'error') {
+          throw new Error(data.error || 'Content generation failed');
+        }
+
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 2000);
+        } else {
+          throw new Error('Content generation timed out');
+        }
+      } else {
+        throw new Error('Failed to check progress');
+      }
+    } catch (error) {
+      console.error('Polling error:', error);
+      showErrorMessage(`Error: ${error.message}`);
+
+      // Restore start button
+      const startBtn = document.getElementById('startLearningBtn');
+      const learningContent = document.getElementById('learningContent');
+
+      if (startBtn) startBtn.style.display = 'block';
+      if (learningContent) learningContent.style.display = 'none';
+    }
+  };
+
+  poll();
+}
+
+// Display generated content
+function displayGeneratedContent(content, subtopicName) {
+  const learningContent = document.getElementById('learningContent');
+  if (!learningContent) return;
+
+  learningContent.innerHTML = `
+    <div class="generated-content">
+      <div class="content-tabs">
+        <button class="tab-btn active" data-step="introduction">1. Introduction</button>
+        <button class="tab-btn" data-step="understanding">2. Understanding</button>
+        <button class="tab-btn" data-step="mastering">3. Mastering</button>
+      </div>
+
+      <div class="content-sections">
+        <div class="content-section active" id="section-introduction">
+          ${content.introduction ? `<div class="content-body">${formatLearningContent(content.introduction)}</div>` : '<p>Content still generating...</p>'}
+        </div>
+        <div class="content-section" id="section-understanding">
+          ${content.understanding ? `<div class="content-body">${formatLearningContent(content.understanding)}</div>` : '<p>Content still generating...</p>'}
+        </div>
+        <div class="content-section" id="section-mastering">
+          ${content.mastering ? `<div class="content-body">${formatLearningContent(content.mastering)}</div>` : '<p>Content still generating...</p>'}
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Add tab switching functionality
+  const tabBtns = learningContent.querySelectorAll('.tab-btn');
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const step = btn.dataset.step;
+
+      // Update tab buttons
+      tabBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // Update content sections
+      const sections = learningContent.querySelectorAll('.content-section');
+      sections.forEach(section => section.classList.remove('active'));
+      document.getElementById(`section-${step}`).classList.add('active');
+    });
+  });
+}
+
+// Format learning content (basic formatting)
+function formatLearningContent(content) {
+  return content
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/^/, '<p>')
+    .replace(/$/, '</p>');
+}
+
 // Copy code functionality
 document.addEventListener("click", function (e) {
   if (
