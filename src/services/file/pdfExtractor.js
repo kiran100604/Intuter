@@ -9,7 +9,8 @@ exports.extractTextFromPDF = async (input) => {
     } else {
       dataBuffer = await fs.readFile(input);
     }
-    const data = await pdfParse(dataBuffer);
+    const parser = new PDFParse();
+    const data = await parser.parseBuffer(dataBuffer);
     let text = data.text;
     text = text.replace(/\s+/g, ' ');
     text = text.replace(/\n{3,}/g, '\n\n');
