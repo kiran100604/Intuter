@@ -1,8 +1,9 @@
-const { StudySession, User } = require("../models");
+const { StudySession, User, Topic, Subtopic } = require("../models");
 const { success, error } = require("../utils/response");
 const { ValidationError } = require("../utils/errors");
 const { extractTextFromPDF } = require("../services/file/pdfExtractor");
 const { extractTextFromDOCX } = require("../services/file/docxExtractor");
+const { generateBlueprint } = require("../services/ai/blueprintGenerator");
 const path = require("path");
 
 // Session management controller skeleton
