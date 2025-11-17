@@ -265,3 +265,48 @@ exports.getSessionStats = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getSessionGenerationStatus = async (req, res, next) => {
+  try {
+    const { sessionId } = req.params;
+    const session = await StudySession.findOne({
+      where: { sessionId, userId: req.user.id },
+    });
+    if (!session) return error(res, "Session not found", 404);
+
+    let topicCount = 0;
+    let subtopicCount = 0;
+    let estimatedTimeRemaining = null;
+
+    if (session.blueprintGenerated) {
+      topicCount = await Topic.count({ where: { sessionId: session.id } });
+      subtopicCount = await Subtopic.count({
+        where: {
+          topicId: (
+            await Topic.findAll({
+              where: { sessionId: session.id },
+              attributes: ["id"],
+            })
+          ).map((t) => t.id),
+        },
+      });
+    } else if (session.status === "generating_blueprint") {
+      // Estimate time remaining for blueprint generation
+      estimatedTimeRemaining = "30-60 seconds";
+    }
+
+    const response = {
+      sessionId: session.sessionId,
+      status: session.status,
+      blueprintGenerated: session.blueprintGenerated,
+      topicCount,
+      subtopicCount,
+      estimatedTimeRemaining,
+      progress: session.blueprintGenerated ? 100 : (session.status === "generating_blueprint" ? 50 : 0)
+    };
+
+    return success(res, response, "Session generation status fetched");
+  } catch (err) {
+    next(err);
+  }
+};
