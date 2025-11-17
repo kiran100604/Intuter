@@ -375,7 +375,169 @@ function addDynamicEventListeners() {
       e.stopPropagation();
       subtopicItems.forEach((sub) => sub.classList.remove("active"));
       item.classList.add("active");
+      showSubtopicLearningContent(item);
     });
+  });
+}
+
+// UI Utility Functions
+function showLoadingState(message) {
+  const existingLoader = document.querySelector('.loading-overlay');
+  if (existingLoader) return;
+
+  const loadingOverlay = document.createElement('div');
+  loadingOverlay.className = 'loading-overlay';
+  loadingOverlay.innerHTML = `
+    <div class="loading-content">
+      <div class="spinner"></div>
+      <div class="loading-message">${message}</div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(loadingOverlay);
+}
+
+function updateLoadingProgress(progress, message) {
+  const progressFill = document.getElementById('progressFill');
+  const loadingMessage = document.querySelector('.loading-message');
+  if (progressFill) progressFill.style.width = `${progress}%`;
+  if (loadingMessage) loadingMessage.textContent = message;
+}
+
+function hideLoadingState() {
+  const loadingOverlay = document.querySelector('.loading-overlay');
+  if (loadingOverlay) {
+    loadingOverlay.remove();
+  }
+}
+
+function showErrorMessage(message) {
+  const errorDiv = document.createElement('div');
+  errorDiv.className = 'error-message';
+  errorDiv.textContent = message;
+  errorDiv.style.position = 'fixed';
+  errorDiv.style.top = '20px';
+  errorDiv.style.right = '20px';
+  errorDiv.style.background = '#f44336';
+  errorDiv.style.color = 'white';
+  errorDiv.style.padding = '12px 20px';
+  errorDiv.style.borderRadius = '4px';
+  errorDiv.style.zIndex = '9999';
+  errorDiv.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+
+  document.body.appendChild(errorDiv);
+
+  setTimeout(() => {
+    errorDiv.remove();
+  }, 5000);
+}
+
+function showMainContent() {
+  const mainContent = document.querySelector('main.main-content');
+  const sidebar = document.querySelector('.sidebar');
+
+  if (mainContent) mainContent.style.display = 'block';
+  if (sidebar) sidebar.style.display = 'block';
+
+  // Show default message
+  mainContent.innerHTML = `
+    <div class="welcome-message">
+      <h2>Welcome to your learning session</h2>
+      <p>Select a subtopic from the sidebar to start learning.</p>
+    </div>
+  `;
+}
+
+// Session polling function
+async function pollSessionGeneration(sessionId) {
+  const token = localStorage.getItem("token");
+  let attempts = 0;
+  const maxAttempts = 60; // 2 minutes with 2-second intervals
+
+  const poll = async () => {
+    try {
+      attempts++;
+
+      const statusResponse = await fetch(
+        `http://localhost:5000/api/sessions/${sessionId}/status`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+
+        if (statusData.progress > 0) {
+          updateLoadingProgress(statusData.progress, `Generating topics... (${statusData.topicCount} topics, ${statusData.subtopicCount} subtopics)`);
+        }
+
+        if (statusData.status === 'ready' && statusData.blueprintGenerated) {
+          hideLoadingState();
+          document.getElementById("session-creation").style.display = "none";
+
+          // Fetch and show topics
+          const sessionDetailsResponse = await fetch(
+            `http://localhost:5000/api/sessions/${sessionId}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+
+          if (sessionDetailsResponse.ok) {
+            const sessionDetails = await sessionDetailsResponse.json();
+            populateSidebar(sessionDetails.session.topics);
+            showMainContent();
+          }
+          return;
+        }
+
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 2000);
+        } else {
+          hideLoadingState();
+          showErrorMessage("Topic generation is taking longer than expected. Please try refreshing the page.");
+        }
+      } else {
+        throw new Error('Failed to check session status');
+      }
+    } catch (error) {
+      console.error('Polling error:', error);
+      if (attempts < maxAttempts) {
+        setTimeout(poll, 2000);
+      } else {
+        hideLoadingState();
+        showErrorMessage("Connection error. Please check your internet and try again.");
+      }
+    }
+  };
+
+  poll();
+}
+
+// Show learning content for subtopic
+function showSubtopicLearningContent(subtopicItem) {
+  const subtopicId = subtopicItem.dataset.id;
+  const subtopicName = subtopicItem.querySelector('span:last-child').textContent;
+  const mainContent = document.querySelector('main.main-content');
+
+  mainContent.innerHTML = `
+    <div class="subtopic-content">
+      <h2>${subtopicName}</h2>
+      <div class="learning-options">
+        <div class="start-learning-btn" id="startLearningBtn">
+          <h3>Ready to start learning?</h3>
+          <p>Click to generate personalized learning content for this topic.</p>
+          <button class="btn-primary">Start Learning</button>
+        </div>
+      </div>
+      <div class="learning-content" id="learningContent" style="display: none;">
+        <!-- Generated content will appear here -->
+      </div>
+    </div>
+  `;
+
+  // Add click handler for "Start Learning" button
+  document.getElementById('startLearningBtn').addEventListener('click', () => {
+    startLearningContentGeneration(subtopicId, subtopicName);
   });
 }
 
