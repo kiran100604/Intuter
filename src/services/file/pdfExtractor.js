@@ -1,4 +1,4 @@
-const { PDFParse } = require('pdf-parse');
+const pdfParse = require('pdf-parse');
 const fs = require('fs').promises;
 
 exports.extractTextFromPDF = async (input) => {
@@ -9,8 +9,7 @@ exports.extractTextFromPDF = async (input) => {
     } else {
       dataBuffer = await fs.readFile(input);
     }
-    const parser = new PDFParse();
-    const data = await parser.parseBuffer(dataBuffer);
+    const data = await pdfParse(dataBuffer);
     let text = data.text;
     text = text.replace(/\s+/g, ' ');
     text = text.replace(/\n{3,}/g, '\n\n');
