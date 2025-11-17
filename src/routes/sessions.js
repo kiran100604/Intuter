@@ -26,5 +26,10 @@ router.get(
   authenticate,
   sessionController.getSessionStats,
 );
+router.get(
+  "/:sessionId/status",
+  authenticate,
+  sessionController.getSessionGenerationStatus,
+);
 
 module.exports = router;
