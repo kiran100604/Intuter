@@ -247,6 +247,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           const goal = document.getElementById("goal").value;
           const outlineFile = document.getElementById("outline").files[0];
 
+          // Show loading state
+          showLoadingState("Creating session...");
+
           // Create FormData for file upload
           const formData = new FormData();
           formData.append("subjectName", subjectName);
@@ -255,24 +258,48 @@ document.addEventListener("DOMContentLoaded", async () => {
             formData.append("outline", outlineFile);
           }
 
-          const createSessionResponse = await fetch(
-            "http://localhost:5000/api/sessions",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${token}`,
+          try {
+            const createSessionResponse = await fetch(
+              "http://localhost:5000/api/sessions",
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+                body: formData,
               },
-              body: formData,
-            },
-          );
-          if (createSessionResponse.ok) {
-            const newSessionData = await createSessionResponse.json();
-            localStorage.setItem("sessionId", newSessionData.session.id);
-            window.location.reload();
-          } else {
-            console.error("Failed to create session");
-            const errorData = await createSessionResponse.json();
-            alert(`Error: ${errorData.message || 'Failed to create session'}`);
+            );
+
+            if (createSessionResponse.ok) {
+              const newSessionData = await createSessionResponse.json();
+              localStorage.setItem("sessionId", newSessionData.session.id);
+
+              // If blueprint is already generated, show topics directly
+              if (newSessionData.session.status === "ready" && newSessionData.session.topicCount > 0) {
+                hideLoadingState();
+                document.getElementById("session-creation").style.display = "none";
+                // Fetch and show topics
+                const sessionDetailsResponse = await fetch(
+                  `http://localhost:5000/api/sessions/${newSessionData.session.id}`,
+                  { headers: { Authorization: `Bearer ${token}` } }
+                );
+                if (sessionDetailsResponse.ok) {
+                  const sessionDetails = await sessionDetailsResponse.json();
+                  populateSidebar(sessionDetails.session.topics);
+                  showMainContent();
+                }
+              } else {
+                // Start polling for blueprint generation
+                pollSessionGeneration(newSessionData.session.id);
+              }
+            } else {
+              hideLoadingState();
+              const errorData = await createSessionResponse.json();
+              showErrorMessage(`Error: ${errorData.message || 'Failed to create session'}`);
+            }
+          } catch (error) {
+            hideLoadingState();
+            showErrorMessage(`Error: ${error.message || 'Network error occurred'}`);
           }
         });
     }
