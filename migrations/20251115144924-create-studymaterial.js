@@ -1,22 +1,41 @@
-'use strict';
+"use strict";
 
-/** @type {import('sequelize-cli').Migration} */
 module.exports = {
-  async up (queryInterface, Sequelize) {
-    /**
-     * Add altering commands here.
-     *
-     * Example:
-     * await queryInterface.createTable('users', { id: Sequelize.INTEGER });
-     */
+  async up(queryInterface, Sequelize) {
+    await queryInterface.createTable("study_materials", {
+      id: {
+        allowNull: false,
+        autoIncrement: true,
+        primaryKey: true,
+        type: Sequelize.INTEGER,
+      },
+      sessionId: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+      },
+      title: {
+        type: Sequelize.STRING,
+        allowNull: false,
+      },
+      file: {
+        type: Sequelize.STRING,
+        allowNull: false,
+      },
+      fileType: {
+        type: Sequelize.ENUM("pdf", "docx", "txt", "image"),
+        allowNull: false,
+      },
+      extractedText: {
+        type: Sequelize.TEXT,
+      },
+      uploadedAt: {
+        type: Sequelize.DATE,
+        defaultValue: Sequelize.NOW,
+      },
+    });
   },
 
-  async down (queryInterface, Sequelize) {
-    /**
-     * Add reverting commands here.
-     *
-     * Example:
-     * await queryInterface.dropTable('users');
-     */
-  }
+  async down(queryInterface, Sequelize) {
+    await queryInterface.dropTable("study_materials");
+  },
 };

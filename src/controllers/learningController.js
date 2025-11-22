@@ -10,11 +10,13 @@ exports.generateLearningContent = async (req, res, next) => {
       return error(res, "subtopicId and sessionId are required", 400);
 
     const subtopic = await Subtopic.findByPk(subtopicId, {
-      include: [{
-        model: require("../models").Topic,
-        as: "topic",
-        where: { sessionId }
-      }]
+      include: [
+        {
+          model: require("../models").Topic,
+          as: "topic",
+          where: { sessionId },
+        },
+      ],
     });
 
     if (!subtopic) return error(res, "Subtopic not found", 404);
@@ -25,7 +27,7 @@ exports.generateLearningContent = async (req, res, next) => {
       progress = await SubtopicProgress.create({
         subtopicId,
         currentStep: "generating",
-        lastAccessed: new Date()
+        lastAccessed: new Date(),
       });
     } else {
       progress.currentStep = "generating";
@@ -38,6 +40,7 @@ exports.generateLearningContent = async (req, res, next) => {
         const steps = ["introduction", "understanding", "mastering"];
 
         for (const step of steps) {
+          console.log(`Generating content for step: ${step}`);
           // Update progress
           progress.currentStep = `generating_${step}`;
           await progress.save();
@@ -71,6 +74,7 @@ exports.generateLearningContent = async (req, res, next) => {
         progress.currentStep = "completed";
         await progress.save();
       } catch (error) {
+        console.error("Error during content generation:", error);
         progress.currentStep = "error";
         progress.error = error.message;
         await progress.save();
@@ -78,12 +82,15 @@ exports.generateLearningContent = async (req, res, next) => {
     });
 
     // Return immediate response
-    return success(res, {
-      status: "generating",
-      subtopicId,
-      message: "Content generation started"
-    }, "Learning content generation initiated");
-
+    return success(
+      res,
+      {
+        status: "generating",
+        subtopicId,
+        message: "Content generation started",
+      },
+      "Learning content generation initiated",
+    );
   } catch (err) {
     next(err);
   }
@@ -92,37 +99,47 @@ exports.generateLearningContent = async (req, res, next) => {
 exports.getContentGenerationProgress = async (req, res, next) => {
   try {
     const { subtopicId } = req.params;
-    if (!subtopicId)
-      return error(res, "subtopicId is required", 400);
+    if (!subtopicId) return error(res, "subtopicId is required", 400);
 
     const progress = await SubtopicProgress.findOne({ where: { subtopicId } });
-    if (!progress)
-      return error(res, "Progress not found", 404);
+    if (!progress) return error(res, "Progress not found", 404);
 
     // Get all generated content
     const contents = await LearningContent.findAll({
       where: { subtopicId },
-      order: [['step', 'ASC']]
+      order: [["step", "ASC"]],
     });
 
     const contentData = {};
-    contents.forEach(content => {
+    contents.forEach((content) => {
       contentData[content.step] = content.content;
     });
 
     const response = {
       currentStep: progress.currentStep,
-      status: progress.currentStep === 'completed' ? 'completed' :
-               progress.currentStep === 'error' ? 'error' : 'generating',
+      status:
+        progress.currentStep === "completed"
+          ? "completed"
+          : progress.currentStep === "error"
+            ? "error"
+            : "generating",
       error: progress.error,
       content: contentData,
-      progress: progress.currentStep === 'completed' ? 100 :
-                progress.currentStep === 'error' ? 0 :
-                progress.currentStep === 'generating_introduction' ? 33 :
-                progress.currentStep === 'generating_understanding' ? 66 :
-                progress.currentStep === 'generating_mastering' ? 99 : 0
+      progress:
+        progress.currentStep === "completed"
+          ? 100
+          : progress.currentStep === "error"
+            ? 0
+            : progress.currentStep === "generating_introduction"
+              ? 33
+              : progress.currentStep === "generating_understanding"
+                ? 66
+                : progress.currentStep === "generating_mastering"
+                  ? 99
+                  : 0,
     };
 
+    res.setHeader("Cache-Control", "no-cache");
     return success(res, response, "Content generation progress fetched");
   } catch (err) {
     next(err);

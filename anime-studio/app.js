@@ -64,8 +64,8 @@ async function sendMessage() {
         );
         if (sessionsResponse.ok) {
           const sessionsData = await sessionsResponse.json();
-          if (sessionsData.sessions.length > 0) {
-            sessionId = sessionsData.sessions[0].id;
+          if (sessionsData.data.sessions.length > 0) {
+            sessionId = sessionsData.data.sessions[0].sessionId;
             localStorage.setItem("sessionId", sessionId);
             window.location.reload(); // Reload to fetch topics for the new session
           } else {
@@ -105,34 +105,49 @@ async function sendMessage() {
 
                   if (createSessionResponse.ok) {
                     const newSessionData = await createSessionResponse.json();
-                    localStorage.setItem("sessionId", newSessionData.session.id);
+                    localStorage.setItem(
+                      "sessionId",
+                      newSessionData.data.session.sessionId,
+                    );
 
                     // If blueprint is already generated, show topics directly
-                    if (newSessionData.session.status === "ready" && newSessionData.session.topicCount > 0) {
+                    if (
+                      newSessionData.data.session.status === "ready" &&
+                      newSessionData.data.session.topicCount > 0
+                    ) {
                       hideLoadingState();
-                      document.getElementById("session-creation").style.display = "none";
+                      document.getElementById(
+                        "session-creation",
+                      ).style.display = "none";
                       // Fetch and show topics
                       const sessionDetailsResponse = await fetch(
-                        `http://localhost:5000/api/sessions/${newSessionData.session.id}`,
-                        { headers: { Authorization: `Bearer ${token}` } }
+                        `http://localhost:5000/api/sessions/${newSessionData.data.session.sessionId}`,
+                        { headers: { Authorization: `Bearer ${token}` } },
                       );
                       if (sessionDetailsResponse.ok) {
-                        const sessionDetails = await sessionDetailsResponse.json();
-                        populateSidebar(sessionDetails.session.topics);
+                        const sessionDetails =
+                          await sessionDetailsResponse.json();
+                        populateSidebar(sessionDetails.data.session.topics);
                         showMainContent();
                       }
                     } else {
                       // Start polling for blueprint generation
-                      pollSessionGeneration(newSessionData.session.id);
+                      pollSessionGeneration(
+                        newSessionData.data.session.sessionId,
+                      );
                     }
                   } else {
                     hideLoadingState();
                     const errorData = await createSessionResponse.json();
-                    showErrorMessage(`Error: ${errorData.message || 'Failed to create session'}`);
+                    showErrorMessage(
+                      `Error: ${errorData.message || "Failed to create session"}`,
+                    );
                   }
                 } catch (error) {
                   hideLoadingState();
-                  showErrorMessage(`Error: ${error.message || 'Network error occurred'}`);
+                  showErrorMessage(
+                    `Error: ${error.message || "Network error occurred"}`,
+                  );
                 }
               });
             return;
@@ -217,8 +232,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       );
       if (sessionsResponse.ok) {
         const sessionsData = await sessionsResponse.json();
-        if (sessionsData.sessions.length > 0) {
-          sessionId = sessionsData.sessions[0].id;
+        if (sessionsData.data.sessions.length > 0) {
+          sessionId = sessionsData.data.sessions[0].sessionId;
           localStorage.setItem("sessionId", sessionId);
         }
       }
@@ -234,7 +249,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (sessionDetailsResponse.ok) {
         const sessionDetailsData = await sessionDetailsResponse.json();
-        populateSidebar(sessionDetailsData.session.topics);
+
+        populateSidebar(sessionDetailsData.data.session.topics);
+
+        if (
+          sessionDetailsData.data.session.topics &&
+          sessionDetailsData.data.session.topics.length > 0
+        ) {
+          showMainContent();
+        }
       }
     } else {
       // Show session creation form
@@ -272,34 +295,45 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             if (createSessionResponse.ok) {
               const newSessionData = await createSessionResponse.json();
-              localStorage.setItem("sessionId", newSessionData.session.id);
+              localStorage.setItem(
+                "sessionId",
+                newSessionData.data.session.sessionId,
+              );
 
               // If blueprint is already generated, show topics directly
-              if (newSessionData.session.status === "ready" && newSessionData.session.topicCount > 0) {
+              if (
+                newSessionData.data.session.status === "ready" &&
+                newSessionData.data.session.topicCount > 0
+              ) {
                 hideLoadingState();
-                document.getElementById("session-creation").style.display = "none";
+                document.getElementById("session-creation").style.display =
+                  "none";
                 // Fetch and show topics
                 const sessionDetailsResponse = await fetch(
-                  `http://localhost:5000/api/sessions/${newSessionData.session.id}`,
-                  { headers: { Authorization: `Bearer ${token}` } }
+                  `http://localhost:5000/api/sessions/${newSessionData.data.session.sessionId}`,
+                  { headers: { Authorization: `Bearer ${token}` } },
                 );
                 if (sessionDetailsResponse.ok) {
                   const sessionDetails = await sessionDetailsResponse.json();
-                  populateSidebar(sessionDetails.session.topics);
+                  populateSidebar(sessionDetails.data.session.topics);
                   showMainContent();
                 }
               } else {
                 // Start polling for blueprint generation
-                pollSessionGeneration(newSessionData.session.id);
+                pollSessionGeneration(newSessionData.data.session.sessionId);
               }
             } else {
               hideLoadingState();
               const errorData = await createSessionResponse.json();
-              showErrorMessage(`Error: ${errorData.message || 'Failed to create session'}`);
+              showErrorMessage(
+                `Error: ${errorData.message || "Failed to create session"}`,
+              );
             }
           } catch (error) {
             hideLoadingState();
-            showErrorMessage(`Error: ${error.message || 'Network error occurred'}`);
+            showErrorMessage(
+              `Error: ${error.message || "Network error occurred"}`,
+            );
           }
         });
     }
@@ -382,11 +416,11 @@ function addDynamicEventListeners() {
 
 // UI Utility Functions
 function showLoadingState(message) {
-  const existingLoader = document.querySelector('.loading-overlay');
+  const existingLoader = document.querySelector(".loading-overlay");
   if (existingLoader) return;
 
-  const loadingOverlay = document.createElement('div');
-  loadingOverlay.className = 'loading-overlay';
+  const loadingOverlay = document.createElement("div");
+  loadingOverlay.className = "loading-overlay";
   loadingOverlay.innerHTML = `
     <div class="loading-content">
       <div class="spinner"></div>
@@ -400,32 +434,32 @@ function showLoadingState(message) {
 }
 
 function updateLoadingProgress(progress, message) {
-  const progressFill = document.getElementById('progressFill');
-  const loadingMessage = document.querySelector('.loading-message');
+  const progressFill = document.getElementById("progressFill");
+  const loadingMessage = document.querySelector(".loading-message");
   if (progressFill) progressFill.style.width = `${progress}%`;
   if (loadingMessage) loadingMessage.textContent = message;
 }
 
 function hideLoadingState() {
-  const loadingOverlay = document.querySelector('.loading-overlay');
+  const loadingOverlay = document.querySelector(".loading-overlay");
   if (loadingOverlay) {
     loadingOverlay.remove();
   }
 }
 
 function showErrorMessage(message) {
-  const errorDiv = document.createElement('div');
-  errorDiv.className = 'error-message';
+  const errorDiv = document.createElement("div");
+  errorDiv.className = "error-message";
   errorDiv.textContent = message;
-  errorDiv.style.position = 'fixed';
-  errorDiv.style.top = '20px';
-  errorDiv.style.right = '20px';
-  errorDiv.style.background = '#f44336';
-  errorDiv.style.color = 'white';
-  errorDiv.style.padding = '12px 20px';
-  errorDiv.style.borderRadius = '4px';
-  errorDiv.style.zIndex = '9999';
-  errorDiv.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+  errorDiv.style.position = "fixed";
+  errorDiv.style.top = "20px";
+  errorDiv.style.right = "20px";
+  errorDiv.style.background = "#f44336";
+  errorDiv.style.color = "white";
+  errorDiv.style.padding = "12px 20px";
+  errorDiv.style.borderRadius = "4px";
+  errorDiv.style.zIndex = "9999";
+  errorDiv.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
 
   document.body.appendChild(errorDiv);
 
@@ -435,11 +469,11 @@ function showErrorMessage(message) {
 }
 
 function showMainContent() {
-  const mainContent = document.querySelector('main.main-content');
-  const sidebar = document.querySelector('.sidebar');
+  const mainContent = document.querySelector("main.main-content");
+  const sidebar = document.querySelector(".sidebar");
 
-  if (mainContent) mainContent.style.display = 'block';
-  if (sidebar) sidebar.style.display = 'block';
+  if (mainContent) mainContent.style.display = "block";
+  if (sidebar) sidebar.style.display = "block";
 
   // Show default message
   mainContent.innerHTML = `
@@ -462,29 +496,51 @@ async function pollSessionGeneration(sessionId) {
 
       const statusResponse = await fetch(
         `http://localhost:5000/api/sessions/${sessionId}/status`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       if (statusResponse.ok) {
         const statusData = await statusResponse.json();
 
-        if (statusData.progress > 0) {
-          updateLoadingProgress(statusData.progress, `Generating topics... (${statusData.topicCount} topics, ${statusData.subtopicCount} subtopics)`);
+        if (!statusData || !statusData.data) {
+          // If statusData or its data property is null/undefined, stop polling.
+          console.error("Polling received invalid status data.");
+          hideLoadingState();
+          showErrorMessage("Failed to get session status. Please refresh.");
+          return;
         }
 
-        if (statusData.status === 'ready' && statusData.blueprintGenerated) {
+        const sessionStatus = statusData.data; // Use the nested data object
+
+        if (sessionStatus.progress > 0) {
+          updateLoadingProgress(
+            sessionStatus.progress,
+            `Generating topics... (${sessionStatus.topicCount} topics, ${sessionStatus.subtopicCount} subtopics)`,
+          );
+        }
+
+        if (sessionStatus.status === "generation_failed") {
+          hideLoadingState();
+          showErrorMessage("Topic generation failed. Please try again.");
+          return;
+        }
+
+        if (
+          sessionStatus.status === "ready" &&
+          sessionStatus.blueprintGenerated
+        ) {
           hideLoadingState();
           document.getElementById("session-creation").style.display = "none";
 
           // Fetch and show topics
           const sessionDetailsResponse = await fetch(
             `http://localhost:5000/api/sessions/${sessionId}`,
-            { headers: { Authorization: `Bearer ${token}` } }
+            { headers: { Authorization: `Bearer ${token}` } },
           );
 
           if (sessionDetailsResponse.ok) {
             const sessionDetails = await sessionDetailsResponse.json();
-            populateSidebar(sessionDetails.session.topics);
+            populateSidebar(sessionDetails.data.session.topics); // Also update here
             showMainContent();
           }
           return;
@@ -494,18 +550,22 @@ async function pollSessionGeneration(sessionId) {
           setTimeout(poll, 2000);
         } else {
           hideLoadingState();
-          showErrorMessage("Topic generation is taking longer than expected. Please try refreshing the page.");
+          showErrorMessage(
+            "Topic generation is taking longer than expected. Please try refreshing the page.",
+          );
         }
       } else {
-        throw new Error('Failed to check session status');
+        throw new Error("Failed to check session status");
       }
     } catch (error) {
-      console.error('Polling error:', error);
+      console.error("Polling error:", error);
       if (attempts < maxAttempts) {
         setTimeout(poll, 2000);
       } else {
         hideLoadingState();
-        showErrorMessage("Connection error. Please check your internet and try again.");
+        showErrorMessage(
+          "Connection error. Please check your internet and try again.",
+        );
       }
     }
   };
@@ -514,54 +574,109 @@ async function pollSessionGeneration(sessionId) {
 }
 
 // Show learning content for subtopic
-function showSubtopicLearningContent(subtopicItem) {
+async function showSubtopicLearningContent(subtopicItem) {
   const subtopicId = subtopicItem.dataset.id;
-  const subtopicName = subtopicItem.querySelector('span:last-child').textContent;
-  const mainContent = document.querySelector('main.main-content');
+  const subtopicName =
+    subtopicItem.querySelector("span:last-child").textContent;
+  const mainContent = document.querySelector("main.main-content");
+  const token = localStorage.getItem("token");
 
   mainContent.innerHTML = `
     <div class="subtopic-content">
-      <h2>${subtopicName}</h2>
-      <div class="learning-options">
-        <div class="start-learning-btn" id="startLearningBtn">
-          <h3>Ready to start learning?</h3>
-          <p>Click to generate personalized learning content for this topic.</p>
-          <button class="btn-primary">Start Learning</button>
-        </div>
-      </div>
-      <div class="learning-content" id="learningContent" style="display: none;">
-        <!-- Generated content will appear here -->
+      <h2 id="subtopic-title">${subtopicName}</h2>
+      <div id="content-container">
+        <div class="loading-spinner"></div>
       </div>
     </div>
   `;
 
-  // Add click handler for "Start Learning" button
-  document.getElementById('startLearningBtn').addEventListener('click', () => {
+  try {
+    const response = await fetch(
+      `http://localhost:5000/api/learning/progress/${subtopicId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache",
+        },
+      },
+    );
+
+    if (response.ok) {
+      const result = await response.json();
+      const content = result.data.content;
+
+      if (
+        result.data.status === "completed" &&
+        content &&
+        Object.keys(content).length > 0
+      ) {
+        displayExistingContent(content, subtopicName);
+      } else if (result.data.status === "generating") {
+        // If generation is already in progress, start polling
+        pollContentGenerationProgress(subtopicId, subtopicName);
+      } else {
+        // If no content, show start button
+        showStartLearningButton(subtopicId, subtopicName);
+      }
+    } else if (response.status === 404) {
+      // Progress not found, so no content has been generated
+      showStartLearningButton(subtopicId, subtopicName);
+    } else {
+      // Handle other errors
+      const errorData = await response.json();
+      showErrorMessage(errorData.message || "Failed to fetch learning content");
+      showStartLearningButton(subtopicId, subtopicName); // Fallback
+    }
+  } catch (error) {
+    console.error("Error fetching subtopic content:", error);
+    showErrorMessage("Network error. Please try again.");
+    showStartLearningButton(subtopicId, subtopicName); // Fallback
+  }
+}
+
+function showStartLearningButton(subtopicId, subtopicName) {
+  const contentContainer = document.getElementById("content-container");
+  if (!contentContainer) return;
+
+  contentContainer.innerHTML = `
+    <div class="learning-options">
+      <div class="start-learning-btn" id="startLearningBtn">
+        <h3>Ready to start learning?</h3>
+        <p>Click to generate personalized learning content for this topic.</p>
+        <button class="btn-primary">Start Learning</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("startLearningBtn").addEventListener("click", () => {
     startLearningContentGeneration(subtopicId, subtopicName);
   });
 }
 
+function displayExistingContent(content, subtopicName) {
+  const contentContainer = document.getElementById("content-container");
+  if (!contentContainer) return;
+
+  // Since displayGeneratedContent uses 'generated-content-container',
+  // let's provide that element.
+  contentContainer.innerHTML = '<div id="generated-content-container"></div>';
+  displayGeneratedContent(content, subtopicName);
+}
+
 // Start learning content generation
 async function startLearningContentGeneration(subtopicId, subtopicName) {
-  const token = localStorage.getItem('token');
-  const sessionId = localStorage.getItem('sessionId');
+  const token = localStorage.getItem("token");
+  const sessionId = localStorage.getItem("sessionId");
 
   if (!token || !sessionId) {
-    showErrorMessage('Please log in and select a session first');
+    showErrorMessage("Please log in and select a session first");
     return;
   }
 
-  // Hide the start learning button and show progress
-  const startBtn = document.getElementById('startLearningBtn');
-  const learningContent = document.getElementById('learningContent');
-
-  if (startBtn) {
-    startBtn.style.display = 'none';
-  }
-
-  if (learningContent) {
-    learningContent.style.display = 'block';
-    learningContent.innerHTML = `
+  // Show progress indicators in the content container
+  const contentContainer = document.getElementById("content-container");
+  if (contentContainer) {
+    contentContainer.innerHTML = `
       <div class="content-generation-progress">
         <h3>Generating Learning Content</h3>
         <div class="step-indicators">
@@ -583,75 +698,76 @@ async function startLearningContentGeneration(subtopicId, subtopicName) {
         </div>
         <p class="progress-text" id="progressText">Initializing...</p>
       </div>
+      <div id="generated-content-container"></div>
     `;
   }
 
   try {
     // Start content generation
-    const response = await fetch('http://localhost:5000/api/learning/content/generate-learning', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+    const response = await fetch(
+      "http://localhost:5000/api/learning/content/generate-learning",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          subtopicId,
+          sessionId,
+        }),
       },
-      body: JSON.stringify({
-        subtopicId,
-        sessionId
-      })
-    });
+    );
 
     if (!response.ok) {
-      throw new Error('Failed to start content generation');
+      throw new Error("Failed to start content generation");
     }
 
     // Start polling for progress
     pollContentGenerationProgress(subtopicId, subtopicName);
-
   } catch (error) {
-    console.error('Error starting content generation:', error);
+    console.error("Error starting content generation:", error);
     showErrorMessage(`Error: ${error.message}`);
-
     // Restore the start button on error
-    if (startBtn) {
-      startBtn.style.display = 'block';
-    }
-    if (learningContent) {
-      learningContent.style.display = 'none';
-    }
+    showStartLearningButton(subtopicId, subtopicName);
   }
 }
 
 // Poll content generation progress
 async function pollContentGenerationProgress(subtopicId, subtopicName) {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem("token");
   let attempts = 0;
   const maxAttempts = 120; // 4 minutes with 2-second intervals
 
   const updateStepProgress = (currentStep, progress) => {
-    const steps = ['introduction', 'understanding', 'mastering'];
-    const stepIndex = steps.indexOf(currentStep.replace('generating_', ''));
+    const steps = ["introduction", "understanding", "mastering"];
+    const stepIndex = steps.indexOf(currentStep.replace("generating_", ""));
 
     steps.forEach((step, index) => {
       const stepElement = document.getElementById(`step-${step}`);
       if (stepElement) {
-        const circle = stepElement.querySelector('.step-circle');
+        const circle = stepElement.querySelector(".step-circle");
 
         if (index < stepIndex) {
-          stepElement.classList.add('completed');
-          circle.textContent = '✓';
+          stepElement.classList.add("completed");
+          circle.textContent = "✓";
         } else if (index === stepIndex) {
-          stepElement.classList.add('active');
+          stepElement.classList.add("active");
         }
       }
     });
 
-    const progressBar = document.getElementById('contentProgress');
-    const progressText = document.getElementById('progressText');
+    const progressBar = document.getElementById("contentProgress");
+    const progressText = document.getElementById("progressText");
 
     if (progressBar) progressBar.style.width = `${progress}%`;
     if (progressText) {
-      const stepText = stepIndex === 0 ? 'Introduction' :
-                      stepIndex === 1 ? 'Understanding' : 'Mastering';
+      const stepText =
+        stepIndex === 0
+          ? "Introduction"
+          : stepIndex === 1
+            ? "Understanding"
+            : "Mastering";
       progressText.textContent = `Generating ${stepText}...`;
     }
   };
@@ -662,42 +778,51 @@ async function pollContentGenerationProgress(subtopicId, subtopicName) {
 
       const response = await fetch(
         `http://localhost:5000/api/learning/progress/${subtopicId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache",
+          },
+        },
       );
 
       if (response.ok) {
         const data = await response.json();
+        console.log("Progress data:", data);
 
-        updateStepProgress(data.currentStep, data.progress);
+        const progressData = data.data;
 
-        if (data.status === 'completed' && data.content) {
-          // Show completed content
-          displayGeneratedContent(data.content, subtopicName);
+        updateStepProgress(progressData.currentStep, progressData.progress);
+
+        if (
+          progressData.status === "completed" ||
+          (progressData.content && Object.keys(progressData.content).length > 0)
+        ) {
+          displayGeneratedContent(progressData.content, subtopicName);
+        }
+
+        if (progressData.status === "completed") {
+          // All content is loaded, stop polling.
           return;
         }
 
-        if (data.status === 'error') {
-          throw new Error(data.error || 'Content generation failed');
+        if (progressData.status === "error") {
+          throw new Error(progressData.error || "Content generation failed");
         }
 
         if (attempts < maxAttempts) {
           setTimeout(poll, 2000);
         } else {
-          throw new Error('Content generation timed out');
+          throw new Error("Content generation timed out");
         }
       } else {
-        throw new Error('Failed to check progress');
+        throw new Error("Failed to check progress");
       }
     } catch (error) {
-      console.error('Polling error:', error);
+      console.error("Polling error:", error);
       showErrorMessage(`Error: ${error.message}`);
-
       // Restore start button
-      const startBtn = document.getElementById('startLearningBtn');
-      const learningContent = document.getElementById('learningContent');
-
-      if (startBtn) startBtn.style.display = 'block';
-      if (learningContent) learningContent.style.display = 'none';
+      showStartLearningButton(subtopicId, subtopicName);
     }
   };
 
@@ -706,57 +831,70 @@ async function pollContentGenerationProgress(subtopicId, subtopicName) {
 
 // Display generated content
 function displayGeneratedContent(content, subtopicName) {
-  const learningContent = document.getElementById('learningContent');
-  if (!learningContent) return;
+  // Hide progress bar if it exists
+  const progressIndicator = document.querySelector(
+    ".content-generation-progress",
+  );
+  if (progressIndicator) {
+    progressIndicator.style.display = "none";
+  }
 
-  learningContent.innerHTML = `
+  const container = document.getElementById("generated-content-container");
+  if (!container) return;
+
+  // Ensure the container is visible
+  container.style.display = "block";
+
+  const contentHtml = `
     <div class="generated-content">
       <div class="content-tabs">
         <button class="tab-btn active" data-step="introduction">1. Introduction</button>
         <button class="tab-btn" data-step="understanding">2. Understanding</button>
         <button class="tab-btn" data-step="mastering">3. Mastering</button>
       </div>
-
       <div class="content-sections">
         <div class="content-section active" id="section-introduction">
-          ${content.introduction ? `<div class="content-body">${formatLearningContent(content.introduction)}</div>` : '<p>Content still generating...</p>'}
+          ${content.introduction ? `<div class="content-body">${formatLearningContent(content.introduction)}</div>` : '<div class="loading-spinner"></div><p>Content is generating...</p>'}
         </div>
         <div class="content-section" id="section-understanding">
-          ${content.understanding ? `<div class="content-body">${formatLearningContent(content.understanding)}</div>` : '<p>Content still generating...</p>'}
+          ${content.understanding ? `<div class="content-body">${formatLearningContent(content.understanding)}</div>` : '<div class="loading-spinner"></div><p>Content is generating...</p>'}
         </div>
         <div class="content-section" id="section-mastering">
-          ${content.mastering ? `<div class="content-body">${formatLearningContent(content.mastering)}</div>` : '<p>Content still generating...</p>'}
+          ${content.mastering ? `<div class="content-body">${formatLearningContent(content.mastering)}</div>` : '<div class="loading-spinner"></div><p>Content is generating...</p>'}
         </div>
       </div>
     </div>
   `;
 
-  // Add tab switching functionality
-  const tabBtns = learningContent.querySelectorAll('.tab-btn');
-  tabBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const step = btn.dataset.step;
+  // Only update if content is different to avoid flicker
+  if (container.innerHTML !== contentHtml) {
+    container.innerHTML = contentHtml;
 
-      // Update tab buttons
-      tabBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      // Update content sections
-      const sections = learningContent.querySelectorAll('.content-section');
-      sections.forEach(section => section.classList.remove('active'));
-      document.getElementById(`section-${step}`).classList.add('active');
+    // Add tab switching functionality
+    const tabBtns = container.querySelectorAll(".tab-btn");
+    tabBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const step = btn.dataset.step;
+        // Update tab buttons
+        tabBtns.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        // Update content sections
+        const sections = container.querySelectorAll(".content-section");
+        sections.forEach((section) => section.classList.remove("active"));
+        container.querySelector(`#section-${step}`).classList.add("active");
+      });
     });
-  });
+  }
 }
 
 // Format learning content (basic formatting)
 function formatLearningContent(content) {
   return content
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/^/, '<p>')
-    .replace(/$/, '</p>');
+    .replace(/\n\n/g, "</p><p>")
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    .replace(/^/, "<p>")
+    .replace(/$/, "</p>");
 }
 
 // Copy code functionality

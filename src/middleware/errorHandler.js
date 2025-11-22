@@ -1,6 +1,8 @@
 exports.errorHandler = (err, req, res, next) => {
   console.error(err);
-  res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
+  const status = err && err.status ? err.status : 500;
+  const message = err && err.message ? err.message : "Internal Server Error";
+  res.status(status).json({ message });
 };
 
 exports.asyncHandler = (fn) => (req, res, next) => {

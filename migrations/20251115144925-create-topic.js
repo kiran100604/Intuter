@@ -1,58 +1,54 @@
-'use strict';
+"use strict";
 
 module.exports = {
-  async up (queryInterface, Sequelize) {
-    await queryInterface.createTable('topics', {
+  async up(queryInterface, Sequelize) {
+    await queryInterface.createTable("topics", {
       id: {
         allowNull: false,
         autoIncrement: true,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        type: Sequelize.INTEGER,
       },
       sessionId: {
         type: Sequelize.INTEGER,
         allowNull: false,
-        references: {
-          model: 'study_sessions',
-          key: 'id'
-        }
       },
       name: {
         type: Sequelize.STRING,
-        allowNull: false
+        allowNull: false,
       },
-      'order': {
+      order: {
         type: Sequelize.INTEGER,
-        defaultValue: 0
+        defaultValue: 0,
       },
       description: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
       },
       prerequisites: {
         type: Sequelize.JSON,
-        defaultValue: []
+        defaultValue: [],
       },
       coreIntuition: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
       },
       intuitionGenerated: {
         type: Sequelize.BOOLEAN,
-        defaultValue: false
+        defaultValue: false,
       },
       difficultyLevel: {
-        type: Sequelize.ENUM('beginner', 'intermediate', 'advanced'),
-        defaultValue: 'intermediate'
+        type: Sequelize.ENUM("beginner", "intermediate", "advanced"),
+        defaultValue: "intermediate",
       },
       createdAt: {
         type: Sequelize.DATE,
-        defaultValue: Sequelize.NOW
-      }
+        defaultValue: Sequelize.NOW,
+      },
     });
 
-    await queryInterface.addIndex('topics', ['order']);
+    await queryInterface.addIndex("topics", ["order"]);
   },
 
-  async down (queryInterface, Sequelize) {
-    await queryInterface.dropTable('topics');
-  }
+  async down(queryInterface, Sequelize) {
+    await queryInterface.dropTable("topics");
+  },
 };
