@@ -2,22 +2,47 @@
     <div class="header-left">
         <div class="logo">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path
+                    d="M12 2L2 7L12 12L22 7L12 2Z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                ></path>
+                <path
+                    d="M2 17L12 22L22 17"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                ></path>
+                <path
+                    d="M2 12L12 17L22 12"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                ></path>
             </svg>
             <span>INTUTER</span>
         </div>
     </div>
     <div class="header-right">
         <!-- Logged out navigation -->
-        <div id="nav-logged-out" style="display: none;">
+        <div id="nav-logged-out" style="display: none">
             <a href="login.html" class="btn-nav">Login</a>
             <a href="register.html" class="btn-primary">Register</a>
         </div>
         <!-- Logged in navigation -->
-        <div id="nav-logged-in" style="display: none;">
-            <a href="profile.html" class="btn-nav">Dashboard</a>
+        <div id="nav-logged-in" style="display: none">
+            <button
+                id="dashboard-btn"
+                onclick="window.location.href='profile.html'"
+                class="btn-nav"
+            >
+                Dashboard
+            </button>
+            <button id="new-session-btn" class="btn-nav">New Session</button>
             <button id="logout-btn" class="btn-primary">Logout</button>
         </div>
     </div>

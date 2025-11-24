@@ -182,6 +182,38 @@ document.addEventListener("DOMContentLoaded", async () => {
             </div>
           `;
 
+          const deleteButton = document.createElement("button");
+          deleteButton.className = "delete-session-btn";
+          deleteButton.innerHTML =
+            '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
+          sessionElement.appendChild(deleteButton);
+
+          deleteButton.addEventListener("click", async (e) => {
+            e.stopPropagation(); // Prevent the card click event
+            if (confirm("Are you sure you want to delete this session?")) {
+              try {
+                const response = await fetch(
+                  `http://localhost:5000/api/sessions/${session.sessionId}`,
+                  {
+                    method: "DELETE",
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                    },
+                  },
+                );
+
+                if (response.ok) {
+                  sessionElement.remove();
+                } else {
+                  const errorData = await response.json();
+                  showError(errorData.message || "Failed to delete session");
+                }
+              } catch (error) {
+                showError("An error occurred while deleting the session.");
+              }
+            }
+          });
+
           sessionElement.addEventListener("click", () => {
             localStorage.setItem("sessionId", session.sessionId);
             window.location.href = "index.html";
@@ -248,14 +280,28 @@ document.addEventListener("DOMContentLoaded", async () => {
       progressFill.style.width = "100%";
 
       // If blueprint is being generated, show progress
-      if (newSessionData.session.status === "generating_blueprint") {
+      if (newSessionData.data.session.status === "generating_blueprint") {
         loadingMessage.textContent = "Generating topics and subtopics...";
-        await pollSessionGeneration(newSessionData.session.sessionId);
+        try {
+          await pollSessionGeneration(newSessionData.data.session.sessionId);
+          localStorage.setItem(
+            "sessionId",
+            newSessionData.data.session.sessionId,
+          );
+          window.location.href = "index.html";
+        } catch (error) {
+          console.error("Polling error:", error);
+          showError(`Error: ${error.message}`);
+          hideLoadingState();
+        }
       } else {
         // Session ready immediately
         loadingMessage.textContent = "Session created successfully!";
         setTimeout(() => {
-          localStorage.setItem("sessionId", newSessionData.session.sessionId);
+          localStorage.setItem(
+            "sessionId",
+            newSessionData.data.session.sessionId,
+          );
           window.location.href = "index.html";
         }, 1500);
       }
@@ -274,48 +320,59 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function pollSessionGeneration(sessionId) {
-    const maxAttempts = 60; // 2 minutes with 2-second intervals
+    return new Promise((resolve, reject) => {
+      const poll = async () => {
+        try {
+          const response = await fetch(
+            `http://localhost:5000/api/sessions/${sessionId}/status`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Cache-Control": "no-cache",
+              },
+              cache: "no-cache",
+            },
+          );
 
-    const poll = async () => {
-      try {
-        const response = await fetch(
-          `http://localhost:5000/api/sessions/${sessionId}/status`,
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
+          if (response.ok) {
+            const statusData = await response.json();
+            const sessionStatus = statusData.data;
+            const progress = Math.min(sessionStatus.progress || 0, 90);
 
-        if (response.ok) {
-          const statusData = await response.json();
-          const progress = Math.min(statusData.progress || 0, 90);
+            progressFill.style.width = `${progress}%`;
+            loadingMessage.textContent = `Generating topics... (${
+              sessionStatus.topicCount || 0
+            } topics, ${sessionStatus.subtopicCount || 0} subtopics)`;
 
-          progressFill.style.width = `${progress}%`;
-          loadingMessage.textContent = `Generating topics... (${statusData.topicCount || 0} topics, ${statusData.subtopicCount || 0} subtopics)`;
+            if (
+              sessionStatus.status === "ready" &&
+              sessionStatus.blueprintGenerated
+            ) {
+              loadingMessage.textContent = "Session ready!";
+              progressFill.style.width = "100%";
+              resolve();
+              return;
+            }
 
-          if (statusData.status === "ready" && statusData.blueprintGenerated) {
-            loadingMessage.textContent = "Session ready!";
-            progressFill.style.width = "100%";
-            setTimeout(() => {
-              localStorage.setItem("sessionId", sessionId);
-              window.location.href = "index.html";
-            }, 1000);
-            return;
+            if (sessionStatus.status === "generation_failed") {
+              throw new Error("Blueprint generation failed. Please try again.");
+            }
+
+            if (sessionStatus.status === "error" || sessionStatus.error) {
+              throw new Error(sessionStatus.error || "Topic generation failed");
+            }
+
+            setTimeout(poll, 2000);
+          } else {
+            throw new Error("Failed to check session status");
           }
-
-          if (statusData.status === "error" || statusData.error) {
-            throw new Error(statusData.error || "Topic generation failed");
-          }
-
-          setTimeout(poll, 2000);
-        } else {
-          throw new Error("Failed to check session status");
+        } catch (error) {
+          reject(error);
         }
-      } catch (error) {
-        console.error("Polling error:", error);
-        showError(`Error: ${error.message}`);
-        hideLoadingState();
-      }
-    };
+      };
 
-    poll();
+      poll();
+    });
   }
 
   // Add CSS animations

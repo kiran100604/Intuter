@@ -273,6 +273,24 @@ body {
     gap: 12px;
 }
 
+.btn-nav {
+    padding: 8px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-nav:hover {
+    background: var(--sidebar-hover);
+    color: var(--text-primary);
+    border-color: var(--accent-color);
+}
+
 .btn-primary {
     padding: 8px 16px;
     background: var(--accent-color);
@@ -758,8 +776,12 @@ body {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 .loading-message {
@@ -1068,7 +1090,7 @@ body {
 .session-card:hover {
     transform: translateY(-4px);
     border-color: var(--accent-color);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
 .session-header {
@@ -1169,7 +1191,11 @@ body {
 }
 
 .card-header {
-    background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
+    background: linear-gradient(
+        135deg,
+        var(--bg-tertiary),
+        var(--bg-secondary)
+    );
     padding: 24px;
     text-align: center;
 }
@@ -1461,4 +1487,71 @@ button:disabled .btn-text {
         padding: 6px 12px;
         font-size: 13px;
     }
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background-color: var(--bg-secondary);
+    margin: auto;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 600px;
+    position: relative;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.close-button {
+    color: var(--text-secondary);
+    position: absolute;
+    top: 15px;
+    right: 25px;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close-button:hover,
+.close-button:focus {
+    color: var(--text-primary);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.delete-session-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    color: var(--text-secondary);
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.delete-session-btn:hover {
+    background: #f44336;
+    color: white;
+    border-color: #f44336;
 }

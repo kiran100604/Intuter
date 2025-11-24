@@ -1,109 +1,235 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your Study Sessions - INTUTER</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <header class="header">
-        <div class="header-left">
-            <div class="logo">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                </svg>
-                <span>INTUTER</span>
-            </div>
-        </div>
-        <div class="header-center">
-            <h1>Your Study Sessions</h1>
-        </div>
-        <div class="header-right">
-            <button class="btn-primary" onclick="window.location.href='login.html'">Logout</button>
-        </div>
-    </header>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Your Study Sessions - INTUTER</title>
+        <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+        <div id="nav-placeholder"></div>
 
-    <div class="container">
-        <div class="main-content">
-            <div class="content-header">
-                <h1>Your Study Sessions</h1>
-                <p class="subtitle">Continue learning or create a new personalized study session.</p>
-            </div>
-
-            <div id="sessions-list" class="sessions-grid"></div>
-
-            <div class="session-creation-card">
-                <div class="card-header">
-                    <h2>Create a new Study Session</h2>
-                    <p>Start with a subject and goal, optionally upload study materials for personalized content.</p>
+        <div class="container">
+            <div class="main-content">
+                <div class="content-header">
+                    <h1>Your Study Sessions</h1>
+                    <p class="subtitle">
+                        Continue learning or create a new personalized study
+                        session.
+                    </p>
                 </div>
 
-                <form id="session-form" class="enhanced-form">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="subjectName">Subject Name</label>
-                            <div class="input-wrapper">
-                                <input type="text" id="subjectName" name="subjectName" placeholder="e.g., Linear Algebra" required>
-                                <div class="input-icon">📚</div>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="goal">Learning Goal</label>
-                            <div class="input-wrapper">
-                                <input type="text" id="goal" name="goal" placeholder="e.g., Prepare for final exam" required>
-                                <div class="input-icon">🎯</div>
-                            </div>
-                        </div>
-                    </div>
+                <div id="sessions-list" class="sessions-grid"></div>
 
-                    <div class="form-group file-upload-group">
-                        <label for="outline">Study Material (Optional)</label>
-                        <div class="file-upload-wrapper" id="fileUploadWrapper">
-                            <div class="file-drop-zone" id="fileDropZone">
-                                <div class="drop-zone-content">
-                                    <div class="upload-icon">📄</div>
-                                    <h4>Drop your PDF here</h4>
-                                    <p>or <span class="browse-text">browse files</span></p>
-                                    <small>Supports PDF files up to 10MB</small>
-                                </div>
-                                <input type="file" id="outline" name="outline" accept=".pdf,application/pdf" hidden>
+                <div id="new-session-modal" class="modal" style="display: none">
+                    <div class="modal-content">
+                        <span class="close-button">&times;</span>
+                        <div class="session-creation-card">
+                            <div class="card-header">
+                                <h2>Create a new Study Session</h2>
+                                <p>
+                                    Start with a subject and goal, optionally
+                                    upload study materials for personalized
+                                    content.
+                                </p>
                             </div>
-                            <div class="file-preview" id="filePreview" style="display: none;">
-                                <div class="file-info">
-                                    <div class="file-icon">📄</div>
-                                    <div class="file-details">
-                                        <div class="file-name" id="fileName"></div>
-                                        <div class="file-size" id="fileSize"></div>
+
+                            <form id="session-form" class="enhanced-form">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="subjectName"
+                                            >Subject Name</label
+                                        >
+                                        <div class="input-wrapper">
+                                            <input
+                                                type="text"
+                                                id="subjectName"
+                                                name="subjectName"
+                                                placeholder="e.g., Linear Algebra"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="goal">Learning Goal</label>
+                                        <div class="input-wrapper">
+                                            <input
+                                                type="text"
+                                                id="goal"
+                                                name="goal"
+                                                placeholder="e.g., Prepare for final exam"
+                                                required
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                                <button type="button" class="remove-file-btn" id="removeFile">✕</button>
-                            </div>
+
+                                <div class="form-group file-upload-group">
+                                    <label for="outline"
+                                        >Study Material (Optional)</label
+                                    >
+                                    <div
+                                        class="file-upload-wrapper"
+                                        id="fileUploadWrapper"
+                                    >
+                                        <div
+                                            class="file-drop-zone"
+                                            id="fileDropZone"
+                                        >
+                                            <div class="drop-zone-content">
+                                                <div class="upload-icon">
+                                                    📄
+                                                </div>
+                                                <h4>Drop your PDF here</h4>
+                                                <p>
+                                                    or
+                                                    <span class="browse-text"
+                                                        >browse files</span
+                                                    >
+                                                </p>
+                                                <small
+                                                    >Supports PDF files up to
+                                                    10MB</small
+                                                >
+                                            </div>
+                                            <input
+                                                type="file"
+                                                id="outline"
+                                                name="outline"
+                                                accept=".pdf,application/pdf"
+                                                hidden
+                                            />
+                                        </div>
+                                        <div
+                                            class="file-preview"
+                                            id="filePreview"
+                                            style="display: none"
+                                        >
+                                            <div class="file-info">
+                                                <div class="file-icon">📄</div>
+                                                <div class="file-details">
+                                                    <div
+                                                        class="file-name"
+                                                        id="fileName"
+                                                    ></div>
+                                                    <div
+                                                        class="file-size"
+                                                        id="fileSize"
+                                                    ></div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                class="remove-file-btn"
+                                                id="removeFile"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-actions">
+                                    <button
+                                        type="submit"
+                                        class="btn-primary btn-large"
+                                        id="submitBtn"
+                                    >
+                                        <span class="btn-text"
+                                            >Create Session</span
+                                        >
+                                        <div
+                                            class="btn-spinner"
+                                            style="display: none"
+                                        ></div>
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
-
-                    <div class="form-actions">
-                        <button type="submit" class="btn-primary btn-large" id="submitBtn">
-                            <span class="btn-text">Create Session</span>
-                            <div class="btn-spinner" style="display: none;"></div>
-                        </button>
-                    </div>
-                </form>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Loading overlay -->
-    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
-        <div class="loading-content">
-            <div class="spinner"></div>
-            <div class="loading-message" id="loadingMessage">Creating session...</div>
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressFill"></div>
+        <!-- Loading overlay -->
+        <div class="loading-overlay" id="loadingOverlay" style="display: none">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <div class="loading-message" id="loadingMessage">
+                    Creating session...
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <script src="profile.js"></script>
-</body>
+        <script src="profile.js"></script>
+        <script>
+            fetch("nav.html")
+                .then((res) => res.text())
+                .then((data) => {
+                    document.getElementById("nav-placeholder").innerHTML = data;
+                    // Post-injection script logic
+                    const token = localStorage.getItem("token");
+                    const navLoggedIn =
+                        document.getElementById("nav-logged-in");
+                    const navLoggedOut =
+                        document.getElementById("nav-logged-out");
+                    const logoutBtn = document.getElementById("logout-btn");
+
+                    if (token) {
+                        navLoggedIn.style.display = "flex";
+                        navLoggedOut.style.display = "none";
+                    } else {
+                        navLoggedIn.style.display = "none";
+                        navLoggedOut.style.display = "flex";
+                    }
+
+                    logoutBtn.addEventListener("click", () => {
+                        localStorage.removeItem("token");
+
+                        localStorage.removeItem("user");
+
+                        localStorage.removeItem("sessionId");
+
+                        window.location.href = "login.html";
+                    });
+
+                    const dashboardBtn =
+                        document.getElementById("dashboard-btn");
+
+                    if (dashboardBtn) {
+                        dashboardBtn.style.display = "none";
+                    }
+
+                    // Modal logic
+
+                    const modal = document.getElementById("new-session-modal");
+
+                    const newSessionBtn =
+                        document.getElementById("new-session-btn");
+
+                    const closeBtn = document.querySelector(".close-button");
+
+                    if (newSessionBtn) {
+                        newSessionBtn.onclick = function () {
+                            modal.style.display = "block";
+                        };
+                    }
+
+                    if (closeBtn) {
+                        closeBtn.onclick = function () {
+                            modal.style.display = "none";
+                        };
+                    }
+
+                    window.onclick = function (event) {
+                        if (event.target == modal) {
+                            modal.style.display = "none";
+                        }
+                    };
+                });
+        </script>
+    </body>
 </html>

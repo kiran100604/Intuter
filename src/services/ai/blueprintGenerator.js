@@ -1,19 +1,60 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { AIGenerationError } = require("../../utils/errors");
 
-if (!process.env.GEMINI_API_KEY) {
+if (process.env.NODE_ENV !== "test" && !process.env.GEMINI_API_KEY) {
   throw new Error("GEMINI_API_KEY environment variable is required");
 }
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const defaultGenAI =
+  process.env.NODE_ENV === "test"
+    ? null
+    : new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-exports.generateBlueprint = async ({ subjectName, goal, outlineText }) => {
-  const prompt = `You are an expert curriculum designer.\n\nSubject: ${subjectName}\nGoal: ${goal}\n\nCourse Outline:\n${outlineText}\n\nGenerate a structured curriculum with:\n1. Main topics (5-10 topics covering the subject)\n2. Subtopics under each topic (3-7 subtopics per topic)\n3. Prerequisites for each topic (topic names that must be completed first)\n4. Difficulty level (beginner/intermediate/advanced)\n5. Estimated duration in minutes for each subtopic\n\nReturn ONLY valid JSON in this exact format:\n{\n  "topics": [\n    {\n      "name": "Topic Name",\n      "description": "Brief description",\n      "difficultyLevel": "beginner",\n      "prerequisites": ["Previous Topic Name"],
-      "subtopics": [\n        {\n          "name": "Subtopic Name",\n          "description": "Brief description",\n          "estimatedDuration": 30\n        }\n      ]\n    }\n  ]\n}\n\nRules:\n- First topic should have no prerequisites\n- Prerequisites must reference existing topic names\n- Each topic should have 3-7 subtopics\n- Subtopics should be ordered logically\n- Duration should be realistic (20-60 minutes)`;
+exports.generateBlueprint = async (
+  { subjectName, goal, outlineText },
+  genAI = defaultGenAI,
+) => {
+  const prompt = `
+    You are a curriculum design expert. Generate a structured curriculum based on the following details:
+    - Subject: ${subjectName}
+    - Goal: ${goal}
+    - Outline: ${outlineText}
+
+    The curriculum should have 5-10 main topics, each with 3-7 subtopics.
+    For each topic, provide: name, description (max 100 chars), difficulty (beginner, intermediate, or advanced), and prerequisites (a list of topic names).
+    For each subtopic, provide: name, description (max 80 chars), and estimatedDuration (in minutes).
+
+    **IMPORTANT**:
+    1. You MUST respond with ONLY a valid JSON object. No other text, formatting, or markdown.
+    2. Keep descriptions concise to ensure the response fits within token limits.
+    3. The JSON must be complete and properly closed.
+    4. Schema:
+    {
+      "topics": [
+        {
+          "name": "Topic Name",
+          "description": "Brief description",
+          "difficultyLevel": "beginner",
+          "prerequisites": [],
+          "subtopics": [
+            {
+              "name": "Subtopic Name",
+              "description": "Brief description",
+              "estimatedDuration": 30
+            }
+          ]
+        }
+      ]
+    }
+  `;
+
   try {
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      generationConfig: { maxOutputTokens: 4000 },
+      generationConfig: {
+        responseMimeType: "application/json",
+        maxOutputTokens: 16000, // Increased token limit
+      },
     });
 
     let result;
@@ -44,27 +85,100 @@ exports.generateBlueprint = async ({ subjectName, goal, outlineText }) => {
       );
     }
 
-    const response = await result.response;
-    const text = response.text();
+    const text = result.response.text();
 
-    const jsonStart = text.indexOf("{");
-    const jsonEnd = text.lastIndexOf("}");
-    if (jsonStart === -1 || jsonEnd === -1)
-      throw new AIGenerationError("AI did not return valid JSON");
-    const json = text.slice(jsonStart, jsonEnd + 1);
-    const blueprint = JSON.parse(json);
-    if (!blueprint.topics || !Array.isArray(blueprint.topics))
-      throw new AIGenerationError("Invalid blueprint structure");
-    console.log("=== AI GENERATED BLUEPRINT ===");
-    console.log("Subject:", subjectName);
-    console.log("Goal:", goal);
-    console.log("Number of topics:", blueprint.topics?.length);
-    console.log("\nFull Blueprint:");
-    console.log(JSON.stringify(blueprint, null, 2));
-    console.log("=== END BLUEPRINT ===");
-    return blueprint;
+    // Check if response was truncated
+    if (!text.trim().endsWith("}")) {
+      console.error("Response appears truncated:", text.slice(-200));
+      throw new AIGenerationError(
+        "AI response was truncated. The curriculum may be too large. Try reducing the outline or requesting fewer topics.",
+      );
+    }
+
+    let cleanedJson = text
+      .replace(/^```json\s*/, "")
+      .replace(/\s*```$/, "")
+      .replace(/,\s*([}\]])/g, "$1")
+      .trim();
+
+    try {
+      // First attempt to parse the cleaned JSON
+      const blueprint = JSON.parse(cleanedJson);
+
+      // Validate structure
+      if (!blueprint.topics || !Array.isArray(blueprint.topics)) {
+        throw new AIGenerationError(
+          "Invalid blueprint structure: missing topics array",
+        );
+      }
+
+      if (blueprint.topics.length === 0) {
+        throw new AIGenerationError(
+          "Invalid blueprint structure: topics array is empty",
+        );
+      }
+
+      // Validate each topic has required fields
+      for (const topic of blueprint.topics) {
+        if (
+          !topic.name ||
+          !topic.subtopics ||
+          !Array.isArray(topic.subtopics)
+        ) {
+          throw new AIGenerationError(
+            `Invalid topic structure: ${topic.name || "unnamed"} is missing required fields`,
+          );
+        }
+      }
+
+      console.log("=== AI GENERATED BLUEPRINT ===");
+      console.log("Subject:", subjectName);
+      console.log("Goal:", goal);
+      console.log("Number of topics:", blueprint.topics?.length);
+      console.log(
+        "Total subtopics:",
+        blueprint.topics.reduce((sum, t) => sum + t.subtopics.length, 0),
+      );
+      console.log("\nFull Blueprint:");
+      console.log(JSON.stringify(blueprint, null, 2));
+      console.log("=== END BLUEPRINT ===");
+
+      return blueprint;
+    } catch (parseErr) {
+      console.error("Failed to parse blueprint JSON:", parseErr.message);
+      console.error("Response length:", text.length);
+      console.error("Last 500 chars:", text.slice(-500));
+
+      // Try to extract partial valid JSON (last resort)
+      try {
+        const jsonMatch = text.match(/\{[\s\S]*"topics"[\s\S]*\}/);
+        if (jsonMatch) {
+          const extractedJson = jsonMatch[0];
+          const blueprint = JSON.parse(extractedJson);
+
+          if (
+            blueprint.topics &&
+            Array.isArray(blueprint.topics) &&
+            blueprint.topics.length > 0
+          ) {
+            console.log("=== AI GENERATED BLUEPRINT (RECOVERED) ===");
+            console.log("Warning: Partial recovery attempted");
+            console.log("Number of topics:", blueprint.topics?.length);
+            console.log("=== END BLUEPRINT ===");
+            return blueprint;
+          }
+        }
+      } catch (recoveryErr) {
+        // Recovery failed, throw original error
+      }
+
+      throw new AIGenerationError(
+        `Failed to parse AI response: ${parseErr.message}. Response may be truncated or malformed.`,
+      );
+    }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
+    console.error("Blueprint generation error:", errorMessage);
     throw new AIGenerationError(errorMessage);
   }
 };

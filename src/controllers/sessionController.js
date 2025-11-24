@@ -298,12 +298,14 @@ exports.getSessionStats = async (req, res, next) => {
       where: { sessionId, userId: req.user.id },
     });
     if (!session) return error(res, "Session not found", 404);
-    const topicCount = await Topic.count({ where: { sessionId: session.id } });
+    const topicCount = await Topic.count({
+      where: { sessionId: session.sessionId },
+    });
     const subtopicCount = await Subtopic.count({
       where: {
         topicId: (
           await Topic.findAll({
-            where: { sessionId: session.id },
+            where: { sessionId: session.sessionId },
             attributes: ["id"],
           })
         ).map((t) => t.id),
@@ -328,12 +330,14 @@ exports.getSessionGenerationStatus = async (req, res, next) => {
     let estimatedTimeRemaining = null;
 
     if (session.blueprintGenerated) {
-      topicCount = await Topic.count({ where: { sessionId: session.id } });
+      topicCount = await Topic.count({
+        where: { sessionId: session.sessionId },
+      });
       subtopicCount = await Subtopic.count({
         where: {
           topicId: (
             await Topic.findAll({
-              where: { sessionId: session.id },
+              where: { sessionId: session.sessionId },
               attributes: ["id"],
             })
           ).map((t) => t.id),
