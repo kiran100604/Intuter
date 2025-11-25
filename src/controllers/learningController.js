@@ -22,61 +22,36 @@ exports.generateLearningContent = async (req, res, next) => {
     if (!subtopic) return error(res, "Subtopic not found", 404);
 
     // Initialize or get progress tracking
-    let progress = await SubtopicProgress.findOne({ where: { subtopicId } });
-    if (!progress) {
-      progress = await SubtopicProgress.create({
+    const [progress] = await SubtopicProgress.findOrCreate({
+      where: { subtopicId },
+      defaults: {
         subtopicId,
         currentStep: "generating",
         lastAccessed: new Date(),
-      });
-    } else {
+      },
+    });
+
+    if (progress.currentStep !== "generating") {
       progress.currentStep = "generating";
+      progress.error = null; // Clear previous errors
       await progress.save();
     }
 
     // Start content generation in background
     setImmediate(async () => {
       try {
-        const steps = ["introduction", "understanding", "mastering"];
-
-        for (const step of steps) {
-          console.log(`Generating content for step: ${step}`);
-          // Update progress
-          progress.currentStep = `generating_${step}`;
-          await progress.save();
-
-          // Generate content
-          const contentText = await generateContent({
-            subtopicName: subtopic.name,
-            step,
-            description: subtopic.description || "",
-          });
-
-          // Store in database
-          let content = await LearningContent.findOne({
-            where: { subtopicId, step },
-          });
-          if (content) {
-            content.content = contentText;
-            content.regeneratedCount += 1;
-            content.generatedAt = new Date();
-            await content.save();
-          } else {
-            content = await LearningContent.create({
-              subtopicId,
-              step,
-              content: contentText,
-            });
-          }
-        }
+        console.log(
+          `Generating narrative content for subtopicId: ${subtopicId}`,
+        );
+        await generateContent({ subtopicId });
 
         // Mark as completed
         progress.currentStep = "completed";
         await progress.save();
-      } catch (error) {
-        console.error("Error during content generation:", error);
+      } catch (e) {
+        console.error("Error during background content generation:", e);
         progress.currentStep = "error";
-        progress.error = error.message;
+        progress.error = e.message;
         await progress.save();
       }
     });
@@ -87,7 +62,7 @@ exports.generateLearningContent = async (req, res, next) => {
       {
         status: "generating",
         subtopicId,
-        message: "Content generation started",
+        message: "Narrative content generation started",
       },
       "Learning content generation initiated",
     );
@@ -104,39 +79,28 @@ exports.getContentGenerationProgress = async (req, res, next) => {
     const progress = await SubtopicProgress.findOne({ where: { subtopicId } });
     if (!progress) return error(res, "Progress not found", 404);
 
-    // Get all generated content
-    const contents = await LearningContent.findAll({
-      where: { subtopicId },
-      order: [["step", "ASC"]],
-    });
+    // Get the single generated content record
+    const content = await LearningContent.findOne({ where: { subtopicId } });
 
-    const contentData = {};
-    contents.forEach((content) => {
-      contentData[content.step] = content.content;
-    });
+    const status = progress.currentStep;
+    let percentage = 0;
+    if (status === "completed") {
+      percentage = 100;
+    } else if (status === "generating") {
+      percentage = 50; // In-progress
+    }
 
     const response = {
-      currentStep: progress.currentStep,
+      currentStep: status,
       status:
-        progress.currentStep === "completed"
+        status === "completed"
           ? "completed"
-          : progress.currentStep === "error"
+          : status === "error"
             ? "error"
             : "generating",
       error: progress.error,
-      content: contentData,
-      progress:
-        progress.currentStep === "completed"
-          ? 100
-          : progress.currentStep === "error"
-            ? 0
-            : progress.currentStep === "generating_introduction"
-              ? 33
-              : progress.currentStep === "generating_understanding"
-                ? 66
-                : progress.currentStep === "generating_mastering"
-                  ? 99
-                  : 0,
+      content: content ? content.toJSON() : null,
+      progress: percentage,
     };
 
     res.setHeader("Cache-Control", "no-cache");
@@ -146,48 +110,13 @@ exports.getContentGenerationProgress = async (req, res, next) => {
   }
 };
 
-exports.generateContent = async (req, res, next) => {
-  try {
-    const { subtopicId, step } = req.body;
-    if (!subtopicId || !step)
-      return error(res, "subtopicId and step are required", 400);
-    const subtopic = await Subtopic.findByPk(subtopicId);
-    if (!subtopic) return error(res, "Subtopic not found", 404);
-    const description = subtopic.description || "";
-    const contentText = await generateContent({
-      subtopicName: subtopic.name,
-      step,
-      description,
-    });
-    let content = await LearningContent.findOne({
-      where: { subtopicId, step },
-    });
-    if (content) {
-      content.content = contentText;
-      content.regeneratedCount += 1;
-      content.generatedAt = new Date();
-      await content.save();
-    } else {
-      content = await LearningContent.create({
-        subtopicId,
-        step,
-        content: contentText,
-      });
-    }
-    return success(res, { content }, "Learning content generated");
-  } catch (err) {
-    next(err);
-  }
-};
-
 exports.getContent = async (req, res, next) => {
   try {
-    const { subtopicId, step } = req.query;
-    if (!subtopicId || !step)
-      return error(res, "subtopicId and step are required", 400);
-    const content = await LearningContent.findOne({
-      where: { subtopicId, step },
-    });
+    const { subtopicId } = req.query;
+    if (!subtopicId) return error(res, "subtopicId is required", 400);
+
+    const content = await LearningContent.findOne({ where: { subtopicId } });
+
     if (!content) return error(res, "Content not found", 404);
     return success(res, { content }, "Learning content fetched");
   } catch (err) {
@@ -196,39 +125,9 @@ exports.getContent = async (req, res, next) => {
 };
 
 exports.regenerateContent = async (req, res, next) => {
-  // Alias for generateContent
-  return exports.generateContent(req, res, next);
-};
-
-exports.markStepComplete = async (req, res, next) => {
-  try {
-    const { subtopicId, step } = req.body;
-    if (!subtopicId || !step)
-      return error(res, "subtopicId and step are required", 400);
-    let progress = await SubtopicProgress.findOne({ where: { subtopicId } });
-    if (!progress) {
-      progress = await SubtopicProgress.create({ subtopicId });
-    }
-    const now = new Date();
-    if (step === "introduction") {
-      progress.introCompleted = true;
-      progress.introCompletedAt = now;
-      progress.currentStep = "understanding";
-    } else if (step === "understanding") {
-      progress.understandingCompleted = true;
-      progress.understandingCompletedAt = now;
-      progress.currentStep = "mastering";
-    } else if (step === "mastering") {
-      progress.masteringCompleted = true;
-      progress.masteringCompletedAt = now;
-      progress.currentStep = "completed";
-    }
-    progress.lastAccessed = now;
-    await progress.save();
-    return success(res, { progress }, "Step marked as complete");
-  } catch (err) {
-    next(err);
-  }
+  // This is now an alias for the primary generation function.
+  // The same body is sent, so we can just call it directly.
+  return exports.generateLearningContent(req, res, next);
 };
 
 exports.getSessionProgress = async (req, res, next) => {

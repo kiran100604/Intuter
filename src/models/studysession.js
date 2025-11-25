@@ -34,6 +34,11 @@ module.exports = (sequelize) => {
         sourceKey: "sessionId",
         as: "context_cache",
       });
+      StudySession.hasOne(models.ContextMemory, {
+        foreignKey: "sessionId",
+        sourceKey: "sessionId",
+        as: "context_memory",
+      });
     }
   }
   StudySession.init(
@@ -60,6 +65,7 @@ module.exports = (sequelize) => {
       lastAccessed: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
       currentTopicId: { type: DataTypes.INTEGER, allowNull: true },
       currentSubtopicId: { type: DataTypes.INTEGER, allowNull: true },
+      narrativeContext: { type: DataTypes.JSON, allowNull: true },
     },
     {
       sequelize,

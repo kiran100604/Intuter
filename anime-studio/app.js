@@ -218,7 +218,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  const user = JSON.parse(localStorage.getItem("user"));
+  let user;
+  try {
+    user = JSON.parse(localStorage.getItem("user"));
+  } catch (error) {
+    console.error("Could not parse user from localStorage:", error);
+    // If user data is critical, redirect to login. Otherwise, can proceed.
+  }
+
   let sessionId = localStorage.getItem("sessionId");
 
   // Fetch sessions and populate the sidebar
@@ -673,37 +680,21 @@ async function startLearningContentGeneration(subtopicId, subtopicName) {
     return;
   }
 
-  // Show progress indicators in the content container
   const contentContainer = document.getElementById("content-container");
   if (contentContainer) {
     contentContainer.innerHTML = `
       <div class="content-generation-progress">
-        <h3>Generating Learning Content</h3>
-        <div class="step-indicators">
-          <div class="step" id="step-introduction">
-            <div class="step-circle">1</div>
-            <span>Introduction</span>
-          </div>
-          <div class="step" id="step-understanding">
-            <div class="step-circle">2</div>
-            <span>Understanding</span>
-          </div>
-          <div class="step" id="step-mastering">
-            <div class="step-circle">3</div>
-            <span>Mastering</span>
-          </div>
-        </div>
+        <h3>Generating Narrative Content</h3>
+        <p class="progress-text" id="progressText">Initializing generation...</p>
         <div class="progress-bar-container">
-          <div class="progress-bar-content" id="contentProgress"></div>
+          <div class="progress-bar-content" id="contentProgress" style="width: 10%;"></div>
         </div>
-        <p class="progress-text" id="progressText">Initializing...</p>
       </div>
       <div id="generated-content-container"></div>
     `;
   }
 
   try {
-    // Start content generation
     const response = await fetch(
       "http://localhost:5000/api/learning/content/generate-learning",
       {
@@ -712,10 +703,7 @@ async function startLearningContentGeneration(subtopicId, subtopicName) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          subtopicId,
-          sessionId,
-        }),
+        body: JSON.stringify({ subtopicId, sessionId }),
       },
     );
 
@@ -723,59 +711,27 @@ async function startLearningContentGeneration(subtopicId, subtopicName) {
       throw new Error("Failed to start content generation");
     }
 
-    // Start polling for progress
     pollContentGenerationProgress(subtopicId, subtopicName);
   } catch (error) {
     console.error("Error starting content generation:", error);
     showErrorMessage(`Error: ${error.message}`);
-    // Restore the start button on error
     showStartLearningButton(subtopicId, subtopicName);
   }
 }
 
-// Poll content generation progress
 async function pollContentGenerationProgress(subtopicId, subtopicName) {
   const token = localStorage.getItem("token");
   let attempts = 0;
-  const maxAttempts = 120; // 4 minutes with 2-second intervals
-
-  const updateStepProgress = (currentStep, progress) => {
-    const steps = ["introduction", "understanding", "mastering"];
-    const stepIndex = steps.indexOf(currentStep.replace("generating_", ""));
-
-    steps.forEach((step, index) => {
-      const stepElement = document.getElementById(`step-${step}`);
-      if (stepElement) {
-        const circle = stepElement.querySelector(".step-circle");
-
-        if (index < stepIndex) {
-          stepElement.classList.add("completed");
-          circle.textContent = "✓";
-        } else if (index === stepIndex) {
-          stepElement.classList.add("active");
-        }
-      }
-    });
-
-    const progressBar = document.getElementById("contentProgress");
-    const progressText = document.getElementById("progressText");
-
-    if (progressBar) progressBar.style.width = `${progress}%`;
-    if (progressText) {
-      const stepText =
-        stepIndex === 0
-          ? "Introduction"
-          : stepIndex === 1
-            ? "Understanding"
-            : "Mastering";
-      progressText.textContent = `Generating ${stepText}...`;
-    }
-  };
+  const maxAttempts = 120; // 4 minutes
 
   const poll = async () => {
-    try {
-      attempts++;
+    if (attempts++ >= maxAttempts) {
+      showErrorMessage("Content generation timed out.");
+      showStartLearningButton(subtopicId, subtopicName);
+      return;
+    }
 
+    try {
       const response = await fetch(
         `http://localhost:5000/api/learning/progress/${subtopicId}`,
         {
@@ -786,42 +742,34 @@ async function pollContentGenerationProgress(subtopicId, subtopicName) {
         },
       );
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Progress data:", data);
+      if (!response.ok) throw new Error("Failed to check progress");
 
-        const progressData = data.data;
+      const result = await response.json();
+      const progressData = result.data;
 
-        updateStepProgress(progressData.currentStep, progressData.progress);
+      const progressBar = document.getElementById("contentProgress");
+      const progressText = document.getElementById("progressText");
 
-        if (
-          progressData.status === "completed" ||
-          (progressData.content && Object.keys(progressData.content).length > 0)
-        ) {
-          displayGeneratedContent(progressData.content, subtopicName);
-        }
+      if (progressBar)
+        progressBar.style.width = `${progressData.progress || 10}%`;
+      if (progressText)
+        progressText.textContent = `Status: ${progressData.currentStep}...`;
 
-        if (progressData.status === "completed") {
-          // All content is loaded, stop polling.
-          return;
-        }
-
-        if (progressData.status === "error") {
-          throw new Error(progressData.error || "Content generation failed");
-        }
-
-        if (attempts < maxAttempts) {
-          setTimeout(poll, 2000);
-        } else {
-          throw new Error("Content generation timed out");
-        }
-      } else {
-        throw new Error("Failed to check progress");
+      if (progressData.status === "completed") {
+        if (progressBar) progressBar.style.width = `100%`;
+        if (progressText) progressText.textContent = `Content ready!`;
+        displayGeneratedContent(progressData.content, subtopicName);
+        return;
       }
+
+      if (progressData.status === "error") {
+        throw new Error(progressData.error || "Content generation failed");
+      }
+
+      setTimeout(poll, 2000);
     } catch (error) {
       console.error("Polling error:", error);
       showErrorMessage(`Error: ${error.message}`);
-      // Restore start button
       showStartLearningButton(subtopicId, subtopicName);
     }
   };
@@ -846,55 +794,125 @@ function displayGeneratedContent(content, subtopicName) {
   container.style.display = "block";
 
   const contentHtml = `
-    <div class="generated-content">
-      <div class="content-tabs">
-        <button class="tab-btn active" data-step="introduction">1. Introduction</button>
-        <button class="tab-btn" data-step="understanding">2. Understanding</button>
-        <button class="tab-btn" data-step="mastering">3. Mastering</button>
-      </div>
-      <div class="content-sections">
-        <div class="content-section active" id="section-introduction">
-          ${content.introduction ? `<div class="content-body">${formatLearningContent(content.introduction)}</div>` : '<div class="loading-spinner"></div><p>Content is generating...</p>'}
+    <div class="generated-content-narrative">
+
+      ${
+        content.story
+          ? `
+        <div class="story-section callout info">
+            <div class="callout-icon">💡</div>
+            <div class="callout-content">
+                <div class="callout-title">Story & Motivation</div>
+                <div class="callout-text">${formatLearningContent(content.story)}</div>
+            </div>
         </div>
-        <div class="content-section" id="section-understanding">
-          ${content.understanding ? `<div class="content-body">${formatLearningContent(content.understanding)}</div>` : '<div class="loading-spinner"></div><p>Content is generating...</p>'}
+      `
+          : ""
+      }
+
+      ${
+        content.theory
+          ? `
+        <div class="theory-section">
+          <h3>Theory & Concepts</h3>
+          <div class="content-body">${formatLearningContent(content.theory)}</div>
         </div>
-        <div class="content-section" id="section-mastering">
-          ${content.mastering ? `<div class="content-body">${formatLearningContent(content.mastering)}</div>` : '<div class="loading-spinner"></div><p>Content is generating...</p>'}
+      `
+          : ""
+      }
+
+      ${
+        content.summary
+          ? `
+        <div class="summary-section callout tip">
+            <div class="callout-icon">✅</div>
+            <div class="callout-content">
+                <div class="callout-title">Summary</div>
+                <div class="callout-text">${formatLearningContent(content.summary)}</div>
+            </div>
         </div>
-      </div>
+      `
+          : ""
+      }
+
     </div>
   `;
 
-  // Only update if content is different to avoid flicker
-  if (container.innerHTML !== contentHtml) {
-    container.innerHTML = contentHtml;
-
-    // Add tab switching functionality
-    const tabBtns = container.querySelectorAll(".tab-btn");
-    tabBtns.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const step = btn.dataset.step;
-        // Update tab buttons
-        tabBtns.forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        // Update content sections
-        const sections = container.querySelectorAll(".content-section");
-        sections.forEach((section) => section.classList.remove("active"));
-        container.querySelector(`#section-${step}`).classList.add("active");
-      });
-    });
-  }
+  container.innerHTML = contentHtml;
 }
 
-// Format learning content (basic formatting)
-function formatLearningContent(content) {
-  return content
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.*?)\*/g, "<em>$1</em>")
-    .replace(/^/, "<p>")
-    .replace(/$/, "</p>");
+function formatLearningContent(text) {
+  if (!text) return "";
+
+  let html = text;
+
+  // Process pedagogical elements first
+  html = html.replace(
+    /> \*\*(Key Concept|Example|Pro Tip)\*\*:([\s\S]*?)(?=\n\n|\n> \*\*|$)/g,
+    (match, type, content) => {
+      let calloutClass = "info";
+      if (type === "Key Concept") calloutClass = "tip";
+      if (type === "Example") calloutClass = "warning"; // Using warning style for examples for visual distinction
+      return `
+            <div class="callout ${calloutClass}">
+                <div class="callout-icon">${type === "Key Concept" ? "🔑" : type === "Example" ? "🔬" : "💡"}</div>
+                <div class="callout-content">
+                    <div class="callout-title">${type}</div>
+                    <div class="callout-text"><p>${content.trim().replace(/\n/g, "<br>")}</p></div>
+                </div>
+            </div>
+        `;
+    },
+  );
+
+  // Process code blocks
+  html = html.replace(/```(\w+)?\n([\s\S]+?)\n```/g, (match, lang, code) => {
+    const language = lang || "plaintext";
+    return `
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-language">${language}</span>
+                    <div class="code-actions">
+                        <button class="code-action-btn">Copy</button>
+                    </div>
+                </div>
+                <div class="code-content"><pre><code>${code.trim()}</code></pre></div>
+            </div>
+        `;
+  });
+
+  // Process headings
+  html = html.replace(/^### (.*$)/gim, "<h4>$1</h4>");
+  html = html.replace(/^## (.*$)/gim, "<h3>$1</h3>");
+  html = html.replace(/^# (.*$)/gim, "<h2>$1</h2>");
+
+  // Process bold and italics
+  html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
+
+  // Process lists
+  html = html.replace(/^\s*[-*] (.*)/gm, "<ul><li>$1</li></ul>");
+  html = html.replace(/<\/ul>\n<ul>/g, ""); // Merge consecutive lists
+
+  // Process paragraphs
+  html = html
+    .split("\n")
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0)
+    .map((p) => {
+      if (p.startsWith("<") && p.endsWith(">")) return p; // Don't wrap existing HTML
+      return `<p>${p}</p>`;
+    })
+    .join("");
+
+  // Cleanup extra paragraph tags around block elements
+  html = html.replace(
+    /<p>(<div class="callout|<div class="code-block|<h2>|<h3>|<h4>|<ul>)/g,
+    "$1",
+  );
+  html = html.replace(/(<\/div>|<\/h2>|<\/h3>|<\/h4>|<\/ul>)<\/p>/g, "$1");
+
+  return html;
 }
 
 // Copy code functionality

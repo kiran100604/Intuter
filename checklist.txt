@@ -1,0 +1,1181 @@
+# Detailed Implementation Checklist
+
+## 📋 Complete System Implementation Guide
+
+---
+
+## **PHASE 1: Database & Data Models**
+
+### 1.1 Database Schema Setup
+
+#### **MongoDB Collections to Create:**
+
+- [ ] `sessions` - User learning sessions
+- [ ] `topics` - Main topics in a session
+- [ ] `subtopics` - Subtopics within topics
+- [ ] `content` - Generated learning content
+- [ ] `context_memory` - Narrative continuity tracking
+- [ ] `concept_graph` - Concept relationships
+- [ ] `user_progress` - Learning progress tracking
+- [ ] `pedagogical_elements` - Reusable learning components
+
+---
+
+### 1.2 Data Models (Mongoose/Prisma Schemas)
+
+#### **Session Model**
+```typescript
+□ SessionSchema
+  Fields:
+  - sessionId: String (unique, indexed)
+  - userId: String (indexed)
+  - subject: String
+  - createdAt: Date
+  - updatedAt: Date
+  - status: Enum ['active', 'completed', 'archived']
+  
+  - narrativeContext: {
+      mainTheme: String
+      realWorldProblem: String
+      targetAudience: String
+      learningObjectives: [String]
+    }
+  
+  - metadata: {
+      difficulty: Enum ['beginner', 'intermediate', 'advanced']
+      estimatedDuration: Number
+      language: String
+    }
+  
+  - topicIds: [ObjectId] (ref: 'Topic')
+  - currentTopicId: ObjectId (ref: 'Topic')
+  - currentSubtopicId: ObjectId (ref: 'Subtopic')
+  
+  Methods:
+  - generateTopics()
+  - getCurrentProgress()
+  - getNextSubtopic()
+```
+
+#### **Topic Model**
+```typescript
+□ TopicSchema
+  Fields:
+  - topicId: String (unique)
+  - sessionId: ObjectId (ref: 'Session', indexed)
+  - title: String
+  - description: String
+  - order: Number
+  - createdAt: Date
+  
+  - prerequisites: [ObjectId] (ref: 'Topic')
+  - dependents: [ObjectId] (ref: 'Topic') // Topics that depend on this
+  - subtopicIds: [ObjectId] (ref: 'Subtopic')
+  
+  - narrativeRole: String // How this fits in the overall story
+  - keyQuestions: [String] // Questions this topic answers
+  
+  - generationStatus: Enum ['pending', 'generating', 'completed', 'failed']
+  - generatedAt: Date
+  
+  Methods:
+  - generateSubtopics()
+  - checkPrerequisites()
+  - getNextTopic()
+```
+
+#### **Subtopic Model**
+```typescript
+□ SubtopicSchema
+  Fields:
+  - subtopicId: String (unique)
+  - topicId: ObjectId (ref: 'Topic', indexed)
+  - title: String
+  - description: String
+  - order: Number
+  - createdAt: Date
+  
+  - prerequisites: [ObjectId] (ref: 'Subtopic')
+  - estimatedTime: Number // in minutes
+  
+  - contentId: ObjectId (ref: 'Content')
+  - generationStatus: Enum ['pending', 'generating', 'completed', 'failed']
+  - generatedAt: Date
+  
+  Methods:
+  - generateContent()
+  - isAvailable() // Check if prerequisites are met
+```
+
+#### **Content Model**
+```typescript
+□ ContentSchema
+  Fields:
+  - contentId: String (unique)
+  - subtopicId: ObjectId (ref: 'Subtopic', indexed)
+  - version: Number
+  - createdAt: Date
+  
+  - structure: {
+      story: {
+        text: String
+        scenario: String
+        problemStatement: String
+        connectionToPrevious: String
+      }
+      
+      conceptIntroduction: {
+        text: String
+        intuition: String
+        realWorldAnalogy: String
+      }
+      
+      theory: {
+        mainContent: String // Rich text with formatting
+        sections: [{
+          title: String
+          content: String
+          order: Number
+        }]
+      }
+      
+      integration: {
+        summary: String
+        keyTakeaways: [String]
+        connectionToNext: String
+      }
+    }
+  
+  - pedagogicalElements: [{
+      type: Enum ['key_concept', 'example', 'pro_tip', 'warning', 'practice_problem', 'definition']
+      title: String
+      content: String
+      position: Number // Where in theory content
+      importance: Enum ['high', 'medium', 'low']
+    }]
+  
+  - conceptsIntroduced: [String] // New concepts in this content
+  - conceptsReinforced: [String] // Previously learned concepts referenced
+  - terminology: [{
+      term: String
+      definition: String
+      firstUsed: Boolean
+    }]
+  - notation: [{
+      symbol: String
+      meaning: String
+      example: String
+    }]
+  
+  - practiceProblems: [{
+      problem: String
+      difficulty: Enum ['easy', 'medium', 'hard']
+      solution: String
+      hints: [String]
+    }]
+  
+  - metadata: {
+      wordCount: Number
+      readingTime: Number
+      complexity: Number
+      aiModel: String
+      promptVersion: String
+      generationTime: Number
+    }
+  
+  Methods:
+  - render()
+  - update()
+  - getNextContent()
+```
+
+#### **Context Memory Model**
+```typescript
+□ ContextMemorySchema
+  Fields:
+  - sessionId: ObjectId (ref: 'Session', unique, indexed)
+  - updatedAt: Date
+  
+  - narrativeTimeline: [{
+      subtopicId: ObjectId (ref: 'Subtopic')
+      timestamp: Date
+      storyElement: String
+      problemSolved: String
+      conceptsIntroduced: [String]
+    }]
+  
+  - terminologyMap: Map<String, {
+      definition: String
+      firstIntroduced: ObjectId (ref: 'Subtopic')
+      usageCount: Number
+      aliases: [String]
+    }>
+  
+  - notationMap: Map<String, {
+      meaning: String
+      firstIntroduced: ObjectId (ref: 'Subtopic')
+      context: String
+      relatedNotations: [String]
+    }>
+  
+  - runningExamples: [{
+      exampleId: String
+      description: String
+      introducedIn: ObjectId (ref: 'Subtopic')
+      revisitedIn: [ObjectId] (ref: 'Subtopic')
+      currentState: String
+    }]
+  
+  - conceptDependencyGraph: {
+      nodes: [{
+        conceptId: String
+        label: String
+        subtopicId: ObjectId
+      }]
+      edges: [{
+        from: String
+        to: String
+        relationship: Enum ['prerequisite', 'builds_on', 'related', 'contrasts']
+      }]
+    }
+  
+  - learningPath: [{
+      subtopicId: ObjectId
+      completedAt: Date
+      understanding: Number // 1-10 score
+    }]
+  
+  Methods:
+  - addToTimeline()
+  - getRecentContext()
+  - addTerminology()
+  - addNotation()
+  - updateConceptGraph()
+```
+
+#### **Concept Graph Model**
+```typescript
+□ ConceptGraphSchema
+  Fields:
+  - sessionId: ObjectId (ref: 'Session', indexed)
+  - subject: String
+  
+  - concepts: [{
+      conceptId: String (unique within session)
+      name: String
+      definition: String
+      category: String
+      difficulty: Number
+      subtopicId: ObjectId (ref: 'Subtopic')
+    }]
+  
+  - relationships: [{
+      fromConceptId: String
+      toConceptId: String
+      type: Enum ['prerequisite', 'extends', 'applies_to', 'similar_to', 'contrasts_with']
+      strength: Number // 0-1
+      description: String
+    }]
+  
+  Methods:
+  - addConcept()
+  - addRelationship()
+  - getPrerequisites()
+  - getRelatedConcepts()
+  - visualizeGraph()
+```
+
+#### **User Progress Model**
+```typescript
+□ UserProgressSchema
+  Fields:
+  - userId: String (indexed)
+  - sessionId: ObjectId (ref: 'Session', indexed)
+  - updatedAt: Date
+  
+  - completedSubtopics: [{
+      subtopicId: ObjectId
+      completedAt: Date
+      timeSpent: Number
+      understanding: Number // Self-reported 1-10
+    }]
+  
+  - masteredConcepts: [{
+      conceptId: String
+      masteryLevel: Number // 0-100
+      lastReviewed: Date
+      practiceCount: Number
+    }]
+  
+  - strugglingAreas: [{
+      subtopicId: ObjectId
+      difficulty: String
+      attempts: Number
+      lastAttempt: Date
+    }]
+  
+  - statistics: {
+      totalTimeSpent: Number
+      averageSessionTime: Number
+      completionRate: Number
+      preferredLearningTime: String
+    }
+  
+  Methods:
+  - markSubtopicComplete()
+  - updateMastery()
+  - getRecommendations()
+```
+
+---
+
+## **PHASE 2: Core Services & Functions**
+
+### 2.1 Context Management Service
+
+```typescript
+□ ContextService Class
+  
+  Methods to implement:
+  
+  - async initializeContext(sessionId: string)
+    • Create new context memory for session
+    • Initialize empty timeline, maps, graph
+    • Return context object
+  
+  - async gatherContext(subtopicId: string)
+    • Fetch current subtopic
+    • Get parent topic and session
+    • Retrieve previous N subtopics (configurable)
+    • Get narrative timeline
+    • Get concepts learned so far
+    • Get terminology and notation maps
+    • Return comprehensive context object
+  
+  - async updateContext(subtopicId: string, generatedContent: Content)
+    • Add to narrative timeline
+    • Extract and add new terminology
+    • Extract and add new notation
+    • Update concept graph
+    • Update running examples
+    • Save to database
+  
+  - async getNarrativeHistory(sessionId: string, limit?: number)
+    • Get last N story elements
+    • Return formatted timeline
+  
+  - async getConceptsLearned(sessionId: string)
+    • Query all completed subtopics
+    • Extract concepts introduced
+    • Return unique list
+  
+  - async getPrerequisites(subtopicId: string)
+    • Query concept graph
+    • Find prerequisite concepts
+    • Return list with context
+  
+  - async getTerminology(sessionId: string)
+    • Get terminology map
+    • Return all terms with definitions
+  
+  - async getNotation(sessionId: string)
+    • Get notation map
+    • Return all symbols with meanings
+  
+  - async validateContinuity(subtopicId: string)
+    • Check if prerequisites met
+    • Verify narrative flow
+    • Return validation result
+```
+
+### 2.2 Content Generation Service
+
+```typescript
+□ ContentGenerationService Class
+  
+  Methods to implement:
+  
+  - async generateTopics(sessionId: string, count: number)
+    • Get session details
+    • Build topic generation prompt
+    • Call AI with structured output
+    • Parse response
+    • Create Topic documents
+    • Update session with topic IDs
+    • Return topics
+  
+  - async generateSubtopics(topicId: string, count: number)
+    • Get topic details
+    • Get session context
+    • Build subtopic generation prompt
+    • Call AI
+    • Parse and create Subtopic documents
+    • Update topic with subtopic IDs
+    • Return subtopics
+  
+  - async generateSubtopicContent(subtopicId: string)
+    Main workflow:
+    1. Update status to 'generating'
+    2. Gather comprehensive context
+    3. Generate story section
+    4. Generate theory section
+    5. Generate pedagogical elements
+    6. Generate practice problems
+    7. Integrate all sections
+    8. Parse and structure content
+    9. Create Content document
+    10. Update context memory
+    11. Update subtopic status
+    12. Return content
+  
+  - async generateStory(context: Context)
+    • Build story prompt
+    • Include previous narrative
+    • Include problem to solve
+    • Call AI
+    • Parse response
+    • Return story object
+  
+  - async generateTheory(context: Context, story: Story)
+    • Build theory prompt
+    • Include story context
+    • Include concepts to cover
+    • Specify pedagogical elements
+    • Call AI
+    • Parse response
+    • Return theory object
+  
+  - async generatePedagogicalElements(context: Context, theory: Theory)
+    • Identify key concepts
+    • Generate examples
+    • Generate pro tips
+    • Generate warnings
+    • Generate practice problems
+    • Return elements array
+  
+  - async integrateContent(story, theory, elements, integration)
+    • Merge all sections
+    • Insert elements at appropriate positions
+    • Format content
+    • Add metadata
+    • Return complete content structure
+  
+  - async regenerateSection(contentId: string, section: string)
+    • Get existing content
+    • Regenerate specific section
+    • Update content
+    • Increment version
+    • Return updated content
+```
+
+### 2.3 Prompt Builder Service
+
+```typescript
+□ PromptBuilderService Class
+  
+  Methods to implement:
+  
+  - buildTopicGenerationPrompt(session: Session)
+    • Include subject
+    • Include learning objectives
+    • Include target audience
+    • Specify count and structure
+    • Return prompt string
+  
+  - buildSubtopicGenerationPrompt(topic: Topic, session: Session)
+    • Include topic details
+    • Include session context
+    • Include existing topics
+    • Specify prerequisites
+    • Return prompt string
+  
+  - buildStoryPrompt(context: Context)
+    • Include subject and topic
+    • Include previous topics
+    • Include narrative history
+    • Include main theme
+    • Specify scenario requirements
+    • Return prompt string
+  
+  - buildTheoryPrompt(context: Context, story: Story)
+    • Include story context
+    • Include concepts to cover
+    • Include prerequisites
+    • Include pedagogical element specs
+    • Include formatting requirements
+    • Include notation/terminology maps
+    • Return prompt string
+  
+  - buildPedagogicalPrompt(context: Context, theory: Theory, type: string)
+    • Specify element type
+    • Include theory content
+    • Include generation guidelines
+    • Return prompt string
+  
+  - buildIntegrationPrompt(context: Context, content: Partial<Content>)
+    • Include all generated sections
+    • Specify summary requirements
+    • Specify forward connections
+    • Return prompt string
+  
+  - addContextSection(prompt: string, context: Context)
+    • Format context information
+    • Add to prompt
+    • Return enhanced prompt
+  
+  - addFormattingInstructions(prompt: string)
+    • Add markdown guidelines
+    • Add structure requirements
+    • Add element placement rules
+    • Return enhanced prompt
+  
+  - getFewShotExamples(type: string)
+    • Return relevant examples
+    • Based on content type
+```
+
+### 2.4 AI Service (Anthropic API Wrapper)
+
+```typescript
+□ AIService Class
+  
+  Methods to implement:
+  
+  - async generateCompletion(prompt: string, options?: GenerationOptions)
+    • Set up API call
+    • Handle rate limiting
+    • Handle retries
+    • Parse response
+    • Log metadata
+    • Return completion
+  
+  - async generateStructuredOutput(prompt: string, schema: JSONSchema)
+    • Add JSON instructions to prompt
+    • Call API
+    • Parse JSON response
+    • Validate against schema
+    • Return structured data
+  
+  - async streamCompletion(prompt: string, onChunk: Function)
+    • Set up streaming
+    • Handle chunks
+    • Call callback
+    • Return full completion
+  
+  - async batchGenerate(prompts: string[])
+    • Queue prompts
+    • Handle rate limits
+    • Process in parallel (with limit)
+    • Return all completions
+  
+  - estimateTokens(text: string)
+    • Calculate approximate tokens
+    • Return count
+  
+  - handleError(error: Error)
+    • Log error
+    • Retry if appropriate
+    • Throw or return fallback
+```
+
+### 2.5 Content Parser Service
+
+```typescript
+□ ContentParserService Class
+  
+  Methods to implement:
+  
+  - parseGeneratedContent(rawContent: string)
+    • Identify sections
+    • Extract story
+    • Extract theory
+    • Extract elements
+    • Extract practice problems
+    • Return structured object
+  
+  - extractPedagogicalElements(content: string)
+    • Find key concept boxes
+    • Find examples
+    • Find pro tips
+    • Find warnings
+    • Find practice problems
+    • Return elements array
+  
+  - extractConcepts(content: string)
+    • Identify new concepts
+    • Extract definitions
+    • Return concepts list
+  
+  - extractTerminology(content: string)
+    • Find defined terms
+    • Extract definitions
+    • Return terminology map
+  
+  - extractNotation(content: string)
+    • Find mathematical notation
+    • Extract meanings
+    • Return notation map
+  
+  - validateStructure(content: Content)
+    • Check required sections
+    • Validate formatting
+    • Check completeness
+    • Return validation result
+  
+  - formatForDisplay(content: Content)
+    • Convert to display format
+    • Add styling markers
+    • Insert interactive elements
+    • Return formatted content
+```
+
+### 2.6 Graph Service
+
+```typescript
+□ GraphService Class
+  
+  Methods to implement:
+  
+  - async buildConceptGraph(sessionId: string)
+    • Get all subtopics
+    • Extract concepts
+    • Determine relationships
+    • Create graph structure
+    • Save to database
+    • Return graph
+  
+  - async addConcept(sessionId: string, concept: Concept)
+    • Validate concept
+    • Add to graph
+    • Determine relationships
+    • Update database
+  
+  - async getPrerequisiteConcepts(conceptId: string)
+    • Query graph
+    • Find prerequisite relationships
+    • Return concepts
+  
+  - async getRelatedConcepts(conceptId: string, relationship: string)
+    • Query graph
+    • Filter by relationship type
+    • Return concepts
+  
+  - async findLearningPath(startConceptId: string, endConceptId: string)
+    • Use graph traversal
+    • Find shortest path
+    • Respect prerequisites
+    • Return path
+  
+  - async suggestNextConcepts(currentConceptId: string, learned: string[])
+    • Get available concepts
+    • Check prerequisites
+    • Rank by relevance
+    • Return suggestions
+  
+  - visualizeGraph(sessionId: string)
+    • Get graph data
+    • Convert to visualization format
+    • Return visualization data
+```
+
+---
+
+## **PHASE 3: API Endpoints**
+
+### 3.1 Session Management Endpoints
+
+```
+□ POST /api/sessions
+  Body: { subject, targetAudience, objectives }
+  Actions:
+  - Create session
+  - Initialize context
+  - Generate initial topics
+  Response: { sessionId, topics }
+
+□ GET /api/sessions/:sessionId
+  Actions:
+  - Get session details
+  - Get progress
+  Response: { session, progress, currentSubtopic }
+
+□ GET /api/sessions/:sessionId/topics
+  Actions:
+  - Get all topics
+  - Include subtopics
+  Response: { topics }
+
+□ POST /api/sessions/:sessionId/topics
+  Body: { count }
+  Actions:
+  - Generate additional topics
+  Response: { topics }
+
+□ DELETE /api/sessions/:sessionId
+  Actions:
+  - Archive session
+  - Clean up data
+  Response: { success }
+```
+
+### 3.2 Topic Management Endpoints
+
+```
+□ GET /api/topics/:topicId
+  Actions:
+  - Get topic details
+  - Get subtopics
+  Response: { topic, subtopics }
+
+□ POST /api/topics/:topicId/subtopics
+  Body: { count }
+  Actions:
+  - Generate subtopics
+  Response: { subtopics }
+
+□ GET /api/topics/:topicId/prerequisites
+  Actions:
+  - Get prerequisite topics
+  Response: { prerequisites }
+```
+
+### 3.3 Content Generation Endpoints
+
+```
+□ POST /api/subtopics/:subtopicId/generate
+  Actions:
+  - Check prerequisites
+  - Gather context
+  - Generate content
+  - Update progress
+  Response: { contentId, status }
+
+□ GET /api/subtopics/:subtopicId/content
+  Actions:
+  - Get generated content
+  - Format for display
+  Response: { content }
+
+□ POST /api/content/:contentId/regenerate
+  Body: { section }
+  Actions:
+  - Regenerate specific section
+  - Update content
+  Response: { content }
+
+□ GET /api/content/:contentId
+  Actions:
+  - Get content
+  - Include metadata
+  Response: { content, metadata }
+```
+
+### 3.4 Progress Tracking Endpoints
+
+```
+□ POST /api/subtopics/:subtopicId/complete
+  Body: { timeSpent, understanding }
+  Actions:
+  - Mark as complete
+  - Update progress
+  - Update context
+  Response: { nextSubtopic }
+
+□ GET /api/sessions/:sessionId/progress
+  Actions:
+  - Calculate progress
+  - Get statistics
+  Response: { progress, stats }
+
+□ POST /api/practice/:problemId/submit
+  Body: { answer }
+  Actions:
+  - Check answer
+  - Update mastery
+  Response: { correct, feedback }
+```
+
+### 3.5 Context & Graph Endpoints
+
+```
+□ GET /api/sessions/:sessionId/context
+  Actions:
+  - Get current context
+  - Get narrative timeline
+  Response: { context, timeline }
+
+□ GET /api/sessions/:sessionId/graph
+  Actions:
+  - Get concept graph
+  - Format for visualization
+  Response: { graph }
+
+□ GET /api/concepts/:conceptId/related
+  Actions:
+  - Get related concepts
+  Response: { concepts, relationships }
+```
+
+---
+
+## **PHASE 4: Frontend Components**
+
+### 4.1 React Components to Build
+
+```typescript
+□ SessionCreator Component
+  Props: { onSessionCreated }
+  Features:
+  - Subject input
+  - Audience selection
+  - Objectives input
+  - Create button
+  - Loading state
+
+□ TopicTree Component
+  Props: { sessionId, onTopicSelect }
+  Features:
+  - Hierarchical display
+  - Topic/subtopic navigation
+  - Progress indicators
+  - Expand/collapse
+
+□ ContentViewer Component
+  Props: { contentId }
+  Features:
+  - Story section
+  - Theory section
+  - Pedagogical elements
+  - Practice problems
+  - Navigation controls
+
+□ PedagogicalElement Component
+  Props: { element }
+  Types:
+  - KeyConcept (purple/blue)
+  - Example (green)
+  - ProTip (yellow)
+  - Warning (red/orange)
+  - PracticeProblem (interactive)
+  - Definition (gray)
+
+□ ProgressTracker Component
+  Props: { sessionId }
+  Features:
+  - Visual progress bar
+  - Completed subtopics list
+  - Time spent
+  - Mastery levels
+
+□ ConceptGraph Component
+  Props: { sessionId }
+  Features:
+  - Interactive graph visualization
+  - Node highlighting
+  - Path tracing
+  - Zoom/pan
+
+□ PracticeProlem Component
+  Props: { problem, onSubmit }
+  Features:
+  - Problem display
+  - Answer input
+  - Hint system
+  - Solution reveal
+  - Feedback display
+
+□ ContentGenerator Component
+  Props: { subtopicId }
+  Features:
+  - Generate button
+  - Loading animation
+  - Progress indicator
+  - Error handling
+
+□ NarrativeTimeline Component
+  Props: { sessionId }
+  Features:
+  - Timeline visualization
+  - Story elements
+  - Concept markers
+  - Interactive navigation
+```
+
+### 4.2 Custom Hooks
+
+```typescript
+□ useSession(sessionId)
+  Returns: { session, loading, error, refresh }
+
+□ useContent(subtopicId)
+  Returns: { content, loading, error, regenerate }
+
+□ useProgress(sessionId)
+  Returns: { progress, updateProgress, complete }
+
+□ useContext(sessionId)
+  Returns: { context, timeline, refresh }
+
+□ useContentGeneration(subtopicId)
+  Returns: { generate, status, progress, error }
+
+□ useConceptGraph(sessionId)
+  Returns: { graph, loading, refresh }
+```
+
+---
+
+## **PHASE 5: Utility Functions**
+
+### 5.1 Helper Functions
+
+```typescript
+□ formatContent(rawContent: string): FormattedContent
+□ parseMarkdown(markdown: string): ReactNode
+□ extractMetadata(content: Content): Metadata
+□ calculateReadingTime(content: string): number
+□ estimateComplexity(content: Content): number
+□ validatePrerequisites(subtopicId: string): boolean
+□ sortByOrder(items: any[]): any[]
+□ generateId(prefix: string): string
+□ sanitizeInput(input: string): string
+□ formatDate(date: Date): string
+□ calculateProgress(completed: number, total: number): number
+□ debounce(func: Function, wait: number): Function
+□ throttle(func: Function, limit: number): Function
+```
+
+### 5.2 Validation Functions
+
+```typescript
+□ validateSession(session: Session): ValidationResult
+□ validateTopic(topic: Topic): ValidationResult
+□ validateContent(content: Content): ValidationResult
+□ validatePrompt(prompt: string): ValidationResult
+□ validateAIResponse(response: string): ValidationResult
+□ checkContentQuality(content: Content): QualityScore
+```
+
+### 5.3 Formatting Functions
+
+```typescript
+□ formatTheoryContent(content: string): string
+□ formatPedagogicalElement(element: Element): JSX.Element
+□ formatMathNotation(notation: string): string
+□ highlightCode(code: string, language: string): string
+□ formatTimeline(timeline: Timeline[]): JSX.Element
+□ formatGraph(graph: Graph): VisualizationData
+```
+
+---
+
+## **PHASE 6: Configuration & Constants**
+
+### 6.1 Configuration Files
+
+```typescript
+□ ai.config.ts
+  - API keys
+  - Model settings
+  - Token limits
+  - Retry configuration
+  - Rate limits
+
+□ content.config.ts
+  - Content structure templates
+  - Pedagogical element types
+  - Formatting rules
+  - Content length guidelines
+
+□ prompt.config.ts
+  - Prompt templates
+  - Few-shot examples
+  - Instruction templates
+  - Formatting guidelines
+
+□ database.config.ts
+  - Connection settings
+  - Collection names
+  - Index definitions
+
+□ app.config.ts
+  - Feature flags
+  - UI settings
+  - Pagination limits
+  - Cache settings
+```
+
+### 6.2 Constants
+
+```typescript
+□ CONTENT_TYPES
+□ PEDAGOGICAL_ELEMENT_TYPES
+□ DIFFICULTY_LEVELS
+□ RELATIONSHIP_TYPES
+□ STATUS_TYPES
+□ GENERATION_STATUS
+□ ERROR_MESSAGES
+□ SUCCESS_MESSAGES
+□ MAX_RETRIES
+□ TIMEOUT_DURATION
+□ CACHE_DURATION
+```
+
+---
+
+## **PHASE 7: Testing**
+
+### 7.1 Unit Tests
+
+```typescript
+□ ContextService tests
+  - Context initialization
+  - Context gathering
+  - Context updating
+  - Narrative timeline
+
+□ ContentGenerationService tests
+  - Topic generation
+  - Subtopic generation
+  - Content generation
+  - Section regeneration
+
+□ PromptBuilderService tests
+  - Prompt construction
+  - Context inclusion
+  - Template rendering
+
+□ ContentParserService tests
+  - Content parsing
+  - Element extraction
+  - Concept extraction
+  - Validation
+
+□ GraphService tests
+  - Graph building
+  - Relationship detection
+  - Path finding
+  - Concept suggestions
+```
+
+### 7.2 Integration Tests
+
+```typescript
+□ End-to-end content generation flow
+□ Session creation to content display
+□ Progress tracking
+□ Context continuity
+□ Graph building and updates
+```
+
+### 7.3 E2E Tests
+
+```typescript
+□ User creates session
+□ User generates topics
+□ User generates and views content
+□ User completes subtopics
+□ User tracks progress
+□ User views concept graph
+```
+
+---
+
+## **PHASE 8: Performance Optimization**
+
+### 8.1 Caching Strategy
+
+```typescript
+□ Implement Redis for:
+  - Session data
+  - Generated content
+  - Context memory
+  - API responses
+
+□ Cache invalidation rules
+□ Cache warming strategy
+□ TTL configuration
+```
+
+### 8.2 Database Optimization
+
+```typescript
+□ Add indexes:
+  - sessionId
+  - userId
+  - topicId
+  - subtopicId
+  - generationStatus
+
+□ Implement pagination
+□ Query optimization
+□ Aggregation pipelines
+```
+
+### 8.3 API Optimization
+
+```typescript
+□ Request batching
+□ Response compression
+□ Rate limiting
+□ Load balancing
+□ CDN integration
+```
+
+---
+
+## **PHASE 9: Monitoring & Logging**
+
+```typescript
+□ Error tracking (Sentry)
+□ Performance monitoring
+□ API usage tracking
+□ Content generation metrics
+□ User behavior analytics
+□ AI response quality metrics
+□ Cost tracking (API calls)
+```
+
+---
+
+## **PHASE 10: Documentation**
+
+```typescript
+□ API documentation
+□ Database schema documentation
+□ Setup instructions
+□ Deployment guide
+□ User guide
+□ Developer guide
+□ Prompt engineering guide
+□ Architecture diagrams
+```
+
+---
+
+## **Implementation Priority Order**
+
+### **Sprint 1: Foundation** (Week 1-2)
+1. Database models
+2. Basic API endpoints
+3. Context service
+4. Prompt builder service
+
+### **Sprint 2: Core Generation** (Week 3-4)
+5. Content generation service
+6. AI service integration
+7. Content parser
+8. Basic frontend components
+
+### **Sprint 3: Enhancement** (Week 5-6)
+9. Graph service
+10. Pedagogical elements
+11. Progress tracking
+12. Advanced UI components
+
+### **Sprint 4: Polish** (Week 7-8)
+13. Testing
+14. Optimization
+15. Monitoring
+16. Documentation
+

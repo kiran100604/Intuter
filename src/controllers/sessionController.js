@@ -194,6 +194,11 @@ exports.getSessionDetails = async (req, res, next) => {
       ],
     });
     if (!session) return error(res, "Session not found", 404);
+    //
+    console.log(
+      "Session details with topics:",
+      JSON.stringify(session, null, 2),
+    );
     return success(res, { session }, "Session details fetched");
   } catch (err) {
     next(err);

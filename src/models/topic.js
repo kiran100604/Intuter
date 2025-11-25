@@ -25,6 +25,8 @@ module.exports = (sequelize) => {
       order: { type: DataTypes.INTEGER, defaultValue: 0 },
       description: { type: DataTypes.TEXT },
       prerequisites: { type: DataTypes.JSON, defaultValue: [] },
+      leadsTo: { type: DataTypes.JSON, defaultValue: [] },
+      narrativeRole: { type: DataTypes.TEXT },
       coreIntuition: { type: DataTypes.TEXT },
       intuitionGenerated: { type: DataTypes.BOOLEAN, defaultValue: false },
       difficultyLevel: {
