@@ -28,8 +28,8 @@ exports.gatherContext = async (subtopicId) => {
   // Get the full context memory for the session
   const contextMemory = await db.ContextMemory.findOrCreate({
     where: { sessionId: session.sessionId },
-    defaults: { sessionId: session.sessionId }
-  }).then(result => result[0]);
+    defaults: { sessionId: session.sessionId },
+  }).then((result) => result[0]);
 
   // Find previous subtopics in the same topic to understand local progression
   const previousSubtopics = await db.Subtopic.findAll({
@@ -40,16 +40,15 @@ exports.gatherContext = async (subtopicId) => {
     order: [["order", "ASC"]],
   });
 
-  // TODO: Implement logic to get all concepts learned so far in the session
-  const conceptsLearned = [];
+  const conceptsLearned = contextMemory.get("conceptsLearned") || [];
 
   return {
     currentSubtopic: subtopic.toJSON(),
     currentTopic: topic.toJSON(),
     session: session.toJSON(),
     contextMemory: contextMemory.toJSON(),
-    previousSubtopics: previousSubtopics.map(st => st.toJSON()),
-    conceptsLearned, // This will be populated later
+    previousSubtopics: previousSubtopics.map((st) => st.toJSON()),
+    conceptsLearned, // Now populated from context memory
   };
 };
 
@@ -60,22 +59,64 @@ exports.gatherContext = async (subtopicId) => {
  * @returns {Promise<void>}
  */
 exports.updateContextMemory = async (sessionId, generatedData) => {
-  const { newNarrativeElements, newTerminology, newNotation, newRunningExamples } = generatedData;
+  const {
+    newNarrativeElements,
+    newTerminology,
+    newNotation,
+    conceptsIntroduced,
+  } = generatedData;
 
-  const contextMemory = await db.ContextMemory.findOne({ where: { sessionId } });
+  const contextMemory = await db.ContextMemory.findOne({
+    where: { sessionId },
+  });
 
   if (!contextMemory) {
     throw new NotFoundError("ContextMemory not found for the session");
   }
 
-  // TODO: Implement the logic to intelligently merge new data
-  // For now, we'll just append to the narrative timeline as an example
-  if (newNarrativeElements) {
-    contextMemory.narrativeTimeline.push(...newNarrativeElements);
+  let changed = false;
+
+  // 1. Update narrative timeline
+  if (newNarrativeElements && newNarrativeElements.length > 0) {
+    const currentTimeline = contextMemory.get("narrativeTimeline") || [];
+    contextMemory.set("narrativeTimeline", [
+      ...currentTimeline,
+      ...newNarrativeElements,
+    ]);
+    changed = true;
   }
 
-  // Mark the JSON fields as modified to ensure they are saved
-  contextMemory.changed('narrativeTimeline', true);
+  // 2. Update terminology map
+  if (newTerminology && Object.keys(newTerminology).length > 0) {
+    const currentTerminology = contextMemory.get("terminologyMap") || {};
+    contextMemory.set("terminologyMap", {
+      ...currentTerminology,
+      ...newTerminology,
+    });
+    changed = true;
+  }
 
-  await contextMemory.save();
+  // 3. Update notation map
+  if (newNotation && Object.keys(newNotation).length > 0) {
+    const currentNotation = contextMemory.get("notationMap") || {};
+    contextMemory.set("notationMap", { ...currentNotation, ...newNotation });
+    changed = true;
+  }
+
+  // 4. Update concepts learned
+  if (conceptsIntroduced && conceptsIntroduced.length > 0) {
+    const currentConcepts = contextMemory.get("conceptsLearned") || [];
+    const uniqueNewConcepts = [
+      ...new Set([...currentConcepts, ...conceptsIntroduced]),
+    ];
+    contextMemory.set("conceptsLearned", uniqueNewConcepts);
+    changed = true;
+  }
+
+  if (changed) {
+    // The 'changed' method is not needed when using .set() followed by .save() for JSON fields in recent Sequelize versions.
+    // However, explicitly marking fields as changed can prevent issues in some edge cases or older versions.
+    // We'll rely on .save() to detect changes made by .set().
+    await contextMemory.save();
+  }
 };

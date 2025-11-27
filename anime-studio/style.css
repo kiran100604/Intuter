@@ -20,12 +20,43 @@
 }
 
 body {
-    font-family:
-        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
-        Arial, sans-serif;
+    font-family: "Inter", sans-serif;
     background: var(--bg-primary);
     color: var(--text-primary);
     line-height: 1.6;
+}
+
+.katex {
+    font-size: 1.1em;
+}
+
+.katex-display {
+    margin: 1.5em 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+/* Inline math */
+.generated-content-narrative p {
+    line-height: 1.8;
+}
+
+/* Math expressions */
+.katex {
+    font-size: 1.1em;
+}
+
+.katex-display {
+    margin: 1.5em 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+/* Code blocks */
+.code-block {
+    margin: 1em 0;
+    border-radius: 6px;
+    overflow: hidden;
 }
 
 /* Header */
@@ -40,6 +71,7 @@ body {
     position: sticky;
     top: 0;
     z-index: 100;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .header-left {
@@ -839,6 +871,9 @@ body {
 .subtopic-content {
     max-width: 800px;
     margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
 .subtopic-content h2 {
@@ -1016,7 +1051,7 @@ body {
 }
 
 .content-sections {
-    max-height: 600px;
+    flex: 1;
     overflow-y: auto;
 }
 

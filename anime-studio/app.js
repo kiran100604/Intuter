@@ -580,7 +580,6 @@ async function pollSessionGeneration(sessionId) {
   poll();
 }
 
-// Show learning content for subtopic
 async function showSubtopicLearningContent(subtopicItem) {
   const subtopicId = subtopicItem.dataset.id;
   const subtopicName =
@@ -666,7 +665,8 @@ function displayExistingContent(content, subtopicName) {
 
   // Since displayGeneratedContent uses 'generated-content-container',
   // let's provide that element.
-  contentContainer.innerHTML = '<div id="generated-content-container"></div>';
+  contentContainer.innerHTML =
+    '<div class="content-sections"><div id="generated-content-container"></div></div>';
   displayGeneratedContent(content, subtopicName);
 }
 
@@ -777,7 +777,6 @@ async function pollContentGenerationProgress(subtopicId, subtopicName) {
   poll();
 }
 
-// Display generated content
 function displayGeneratedContent(content, subtopicName) {
   // Hide progress bar if it exists
   const progressIndicator = document.querySelector(
@@ -802,7 +801,7 @@ function displayGeneratedContent(content, subtopicName) {
         <div class="story-section callout info">
             <div class="callout-icon">💡</div>
             <div class="callout-content">
-                <div class="callout-title">Story & Motivation</div>
+                <div class="callout-title">Basic Intro..</div>
                 <div class="callout-text">${formatLearningContent(content.story)}</div>
             </div>
         </div>
@@ -839,6 +838,19 @@ function displayGeneratedContent(content, subtopicName) {
   `;
 
   container.innerHTML = contentHtml;
+
+  // Render math expressions
+  renderMathInElement(container, {
+    delimiters: [
+      { left: "$$", right: "$$", display: true },
+      { left: "$", right: "$", display: false },
+      { left: "\\[", right: "\\]", display: true },
+      { left: "\\(", right: "\\)", display: false },
+    ],
+  });
+
+  const mainContent = document.querySelector("main.main-content");
+  mainContent.scrollTop = 0;
 }
 
 function formatLearningContent(text) {
@@ -852,7 +864,7 @@ function formatLearningContent(text) {
     (match, type, content) => {
       let calloutClass = "info";
       if (type === "Key Concept") calloutClass = "tip";
-      if (type === "Example") calloutClass = "warning"; // Using warning style for examples for visual distinction
+      if (type === "Example") calloutClass = "warning";
       return `
             <div class="callout ${calloutClass}">
                 <div class="callout-icon">${type === "Key Concept" ? "🔑" : type === "Example" ? "🔬" : "💡"}</div>
@@ -865,34 +877,101 @@ function formatLearningContent(text) {
     },
   );
 
-  // Process code blocks
-  html = html.replace(/```(\w+)?\n([\s\S]+?)\n```/g, (match, lang, code) => {
-    const language = lang || "plaintext";
-    return `
-            <div class="code-block">
-                <div class="code-header">
-                    <span class="code-language">${language}</span>
-                    <div class="code-actions">
-                        <button class="code-action-btn">Copy</button>
-                    </div>
-                </div>
-                <div class="code-content"><pre><code>${code.trim()}</code></pre></div>
-            </div>
-        `;
+  // NEW: Convert vector notation to LaTeX BEFORE processing code blocks
+  // Handle vectors like v₁ = [1, 2, 3]ᵀ
+  html = html.replace(
+    /([a-zA-Z])([₀₁₂₃₄₅₆₇₈₉]+)\s*=\s*\[([^\]]+)\]ᵀ/g,
+    (match, variable, subscript, values) => {
+      const subscriptMap = {
+        "₀": "0",
+        "₁": "1",
+        "₂": "2",
+        "₃": "3",
+        "₄": "4",
+        "₅": "5",
+        "₆": "6",
+        "₇": "7",
+        "₈": "8",
+        "₉": "9",
+      };
+      const normalSubscript = subscript
+        .split("")
+        .map((c) => subscriptMap[c] || c)
+        .join("");
+      const valuesFormatted = values
+        .split(",")
+        .map((v) => v.trim())
+        .join(", ");
+      return `$${variable}_{${normalSubscript}} = \\begin{bmatrix} ${valuesFormatted} \\end{bmatrix}^T$`;
+    },
+  );
+
+  // Handle matrix equations like Ac = 0
+  html = html.replace(/([A-Z])([a-z])\s*=\s*([0-9]+)/g, "$$$1$2 = $3$$");
+
+  // Handle subscripted variables in equations (c₁, c₂, etc.)
+  html = html.replace(
+    /([a-z])([₀₁₂₃₄₅₆₇₈₉]+)/g,
+    (match, variable, subscript) => {
+      const subscriptMap = {
+        "₀": "0",
+        "₁": "1",
+        "₂": "2",
+        "₃": "3",
+        "₄": "4",
+        "₅": "5",
+        "₆": "6",
+        "₇": "7",
+        "₈": "8",
+        "₉": "9",
+      };
+      const normalSubscript = subscript
+        .split("")
+        .map((c) => subscriptMap[c] || c)
+        .join("");
+      return `$${variable}_{${normalSubscript}}$`;
+    },
+  );
+
+  // Process matrix and code blocks
+  html = html.replace(/```(\w*)?\n([\s\S]*?)\n```/g, (match, lang, code) => {
+    if (
+      lang === "matrix" ||
+      (!lang && code.includes("[") && code.includes("]"))
+    ) {
+      return convertMatrixToLatex(code);
+    } else {
+      const language = lang || "plaintext";
+      return `
+              <div class="code-block">
+                  <div class="code-header">
+                      <span class="code-language">${language}</span>
+                      <div class="code-actions">
+                          <button class="code-action-btn">Copy</button>
+                      </div>
+                  </div>
+                  <div class="code-content"><pre><code>${escapeHtml(code.trim())}</code></pre></div>
+              </div>
+          `;
+    }
   });
 
   // Process headings
+  html = html.replace(/^#### (.*$)/gim, "<h5>$1</h5>");
   html = html.replace(/^### (.*$)/gim, "<h4>$1</h4>");
   html = html.replace(/^## (.*$)/gim, "<h3>$1</h3>");
   html = html.replace(/^# (.*$)/gim, "<h2>$1</h2>");
 
-  // Process bold and italics
-  html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-  html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
+  // Process bold and italics (but protect LaTeX from being processed)
+  html = html.replace(/\*\*(?!\$)(.*?)(?<!\$)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/\*(?!\$)(.*?)(?<!\$)\*/g, "<em>$1</em>");
 
   // Process lists
   html = html.replace(/^\s*[-*] (.*)/gm, "<ul><li>$1</li></ul>");
-  html = html.replace(/<\/ul>\n<ul>/g, ""); // Merge consecutive lists
+  html = html.replace(/<\/ul>\n<ul>/g, "");
+
+  // Process blockquotes
+  html = html.replace(/^> (.*$)/gim, "<blockquote>$1</blockquote>");
 
   // Process paragraphs
   html = html
@@ -900,19 +979,105 @@ function formatLearningContent(text) {
     .map((p) => p.trim())
     .filter((p) => p.length > 0)
     .map((p) => {
-      if (p.startsWith("<") && p.endsWith(">")) return p; // Don't wrap existing HTML
+      if (p.startsWith("<") && p.endsWith(">")) return p;
+      if (p.startsWith("$$") || p.includes("$$")) return p;
+      if (p.startsWith("$") && p.endsWith("$")) return p;
       return `<p>${p}</p>`;
     })
     .join("");
 
-  // Cleanup extra paragraph tags around block elements
+  // Cleanup extra paragraph tags
   html = html.replace(
-    /<p>(<div class="callout|<div class="code-block|<h2>|<h3>|<h4>|<ul>)/g,
+    /<p>(<div class="callout"|<div class="code-block"|<h2>|<h3>|<h4>|<h5>|<ul>|<blockquote>)/g,
     "$1",
   );
-  html = html.replace(/(<\/div>|<\/h2>|<\/h3>|<\/h4>|<\/ul>)<\/p>/g, "$1");
+  html = html.replace(
+    /(<\/div>|<\/h2>|<\/h3>|<\/h4>|<\/h5>|<\/ul>|<\/blockquote>)<\/p>/g,
+    "$1",
+  );
 
   return html;
+}
+
+function convertMatrixToLatex(code) {
+  const rows = code.trim().split("\n");
+  let latexMatrix = "$$\n";
+
+  // Check if this is an augmented matrix with | separator
+  if (rows.every((row) => row.includes("|"))) {
+    const firstRow = rows[0].split("|")[0].trim();
+    const numCols =
+      firstRow
+        .match(/\[([^\]]+)\]/)?.[1]
+        .split(/[,\s]+/)
+        .filter((x) => x).length ||
+      firstRow.split(/\s+/).filter((x) => x && x !== "[" && x !== "]").length;
+
+    latexMatrix += `\\left[\\begin{array}{${"c".repeat(numCols)}|c}\n`;
+    rows.forEach((row) => {
+      const parts = row.split("|");
+      const left = parts[0]
+        .trim()
+        .replace(/\[|\]/g, "")
+        .replace(/,/g, "")
+        .replace(/\s+/g, " & ");
+      const right = parts[1].trim().replace(/\[|\]/g, "");
+      latexMatrix += `${left} & ${right} \\\\\n`;
+    });
+    latexMatrix += "\\end{array}\\right]";
+  }
+  // Check if this is a matrix equation (contains = or multiple matrices)
+  else if (rows.some((row) => row.includes("="))) {
+    rows.forEach((row) => {
+      // Split by = to handle equations
+      const parts = row.split("=");
+      const processedParts = parts.map((part) => {
+        // Extract matrix content
+        const matrixMatch = part.match(/\[([^\]]+)\]/g);
+        if (matrixMatch) {
+          return matrixMatch
+            .map((m) => {
+              const values = m
+                .replace(/\[|\]/g, "")
+                .split(/[,\s]+/)
+                .filter((x) => x)
+                .join(" & ");
+              return `\\begin{bmatrix} ${values} \\end{bmatrix}`;
+            })
+            .join(" ");
+        }
+        return part.trim();
+      });
+      latexMatrix += processedParts.join(" = ") + "\\\\\n";
+    });
+  }
+  // Simple matrix or column vectors
+  else {
+    latexMatrix += "\\begin{bmatrix}\n";
+    rows.forEach((row) => {
+      const cleaned = row
+        .trim()
+        .replace(/\[|\]/g, "")
+        .replace(/,/g, "")
+        .replace(/\s+/g, " & ");
+      latexMatrix += cleaned + " \\\\\n";
+    });
+    latexMatrix += "\\end{bmatrix}";
+  }
+
+  latexMatrix += "\n$$";
+  return latexMatrix;
+}
+
+function escapeHtml(text) {
+  const map = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  };
+  return text.replace(/[&<>"']/g, (m) => map[m]);
 }
 
 // Copy code functionality
