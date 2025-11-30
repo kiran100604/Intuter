@@ -310,27 +310,36 @@ const buildMasterPrompt = (context) => {
  * @returns {object} - An object with keys like 'story', 'theory', etc.
  */
 const parseAIResponse = (text) => {
-  const story =
-    text
-      .split(/## 1\. Real-World Context & Motivation/i)[1]
-      ?.split(/## 2\. Intuitive Foundation/i)[0]
-      ?.trim() || "";
-  const introduction =
-    text
-      .split(/## 2\. Intuitive Foundation/i)[1]
-      ?.split(/## 3\. Complete Theory/i)[0]
-      ?.trim() || "";
-  const theory =
-    text
-      .split(/## 3\. Complete Theory/i)[1]
-      ?.split(/## 4\. Synthesis & Reinforcement/i)[0]
-      ?.trim() || "";
-  const summary =
-    text
-      .split(/## 4\. Synthesis & Reinforcement/i)[1]
-      ?.split(/## 5\. Metadata/i)[0]
-      ?.trim() || "";
-  const metadataText = text.split(/## 5\. Metadata/i)[1]?.trim();
+  // Helper to extract content between two regex patterns
+  const extractSection = (startPattern, endPattern) => {
+    const parts = text.split(startPattern);
+    if (parts.length < 2) return "";
+    const content = parts[1].split(endPattern)[0];
+    return content ? content.trim() : "";
+  };
+
+  // More flexible patterns that match the section number and key words
+  const story = extractSection(
+    /##\s*1\.\s*Real-World.*/i,
+    /##\s*2\.\s*Intuitive.*/i
+  );
+
+  const introduction = extractSection(
+    /##\s*2\.\s*Intuitive.*/i,
+    /##\s*3\.\s*(?:Complete|Theory).*/i
+  );
+
+  const theoryBody = extractSection(
+    /##\s*3\.\s*(?:Complete|Theory).*/i,
+    /##\s*4\.\s*Synthesis.*/i
+  );
+
+  const summary = extractSection(
+    /##\s*4\.\s*Synthesis.*/i,
+    /##\s*5\.\s*Metadata.*/i
+  );
+
+  const metadataText = text.split(/##\s*5\.\s*Metadata.*/i)[1]?.trim();
 
   let metadata = {};
   if (metadataText) {
@@ -347,14 +356,14 @@ const parseAIResponse = (text) => {
 
   // Simple extraction of pedagogical elements for now
   const pedagogicalElements = {
-    keyConcepts: theory.match(/> \*\*Key Concept\*\*:/g)?.length || 0,
-    examples: theory.match(/> \*\*Example\*\*:/g)?.length || 0,
-    proTips: theory.match(/> \*\*Pro Tip\*\*:/g)?.length || 0,
+    keyConcepts: theoryBody.match(/> \*\*Key Concept\*\*:/g)?.length || 0,
+    examples: theoryBody.match(/> \*\*Example\*\*:/g)?.length || 0,
+    proTips: theoryBody.match(/> \*\*Pro Tip\*\*:/g)?.length || 0,
   };
 
   return {
     story,
-    theory: `${introduction}\n\n${theory}`, // Combine intro and theory
+    theory: `${introduction}\n\n${theoryBody}`, // Combine intro and theory
     summary,
     pedagogicalElements,
     metadata,
@@ -388,6 +397,9 @@ exports.generateContent = async ({ subtopicId }) => {
     const parsedContent = parseAIResponse(text);
 
     if (!parsedContent.story || !parsedContent.theory) {
+      console.error("AI Response Parsing Failed. Raw Text Length:", text.length);
+      console.error("Raw Text Preview:", text.substring(0, 500) + "...");
+      console.error("Parsed Content:", JSON.stringify(parsedContent, null, 2));
       throw new AIGenerationError(
         "Failed to parse the AI response into the required structure.",
       );

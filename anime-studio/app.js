@@ -866,27 +866,9 @@ function formatLearningContent(text) {
   if (!text) return "";
 
   let html = text;
+  const callouts = [];
 
-  // Process pedagogical elements first
-  html = html.replace(
-    /> \*\*(Key Concept|Example|Pro Tip)\*\*:([\s\S]*?)(?=\n\n|\n> \*\*|$)/g,
-    (match, type, content) => {
-      let calloutClass = "info";
-      if (type === "Key Concept") calloutClass = "tip";
-      if (type === "Example") calloutClass = "warning";
-      return `
-            <div class="callout ${calloutClass}">
-                <div class="callout-icon">${type === "Key Concept" ? "🔑" : type === "Example" ? "🔬" : "💡"}</div>
-                <div class="callout-content">
-                    <div class="callout-title">${type}</div>
-                    <div class="callout-text"><p>${content.trim().replace(/\n/g, "<br>")}</p></div>
-                </div>
-            </div>
-        `;
-    },
-  );
-
-  // NEW: Convert vector notation to LaTeX BEFORE processing code blocks
+  // NEW: Convert vector notation to LaTeX BEFORE processing code blocks or callouts
   // Handle vectors like v₁ = [1, 2, 3]ᵀ
   html = html.replace(
     /([a-zA-Z])([₀₁₂₃₄₅₆₇₈₉]+)\s*=\s*\[([^\]]+)\]ᵀ/g,
@@ -942,6 +924,175 @@ function formatLearningContent(text) {
     },
   );
 
+  // 1. Process Pedagogical Elements (Callouts) using a State Machine Parser
+  // This is more robust than regex for handling nested content, missing markers, and multi-line blocks.
+
+  const lines = html.split(/\r?\n/);
+  const processedLines = [];
+  let currentCard = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmedLine = line.trim();
+
+    // Check for Card Start
+    // Matches: 
+    // 1. Optional Indentation/Blockquote/Headers
+    // 2. Optional Emojis
+    // 3. Optional Bold markers
+    // 4. Title/Type
+    // 5. Colon
+    const cardStartMatch = line.match(/^\s*(?:#+\s*)?(?:>\s*)?(?:[^\w\s\*]+\s*)*(?:\*\*)?([^\*:]+)(?:\*\*)?[:]/);
+
+    // DEBUG: Log lines that look like cards but fail matching
+    if (!cardStartMatch && (line.includes("Key Definition") || line.includes("Pro Tip") || line.includes("Common Pitfall"))) {
+      console.log("DEBUG: Suspicious line failed regex:", JSON.stringify(line));
+    }
+
+    if (cardStartMatch) {
+      let boldContent = cardStartMatch[1];
+      // Clean up any remaining leading emojis/symbols from the captured group
+      boldContent = boldContent.replace(/^[^\w\s]+\s*/, "");
+
+      const parts = boldContent.split(":");
+      const possibleType = parts[0].trim().toLowerCase();
+
+      let isKnownType = false;
+      let calloutClass = "info";
+      let icon = "💡";
+
+      if (possibleType.includes("definition")) {
+        calloutClass = "definition";
+        icon = "🔑";
+        isKnownType = true;
+      } else if (possibleType.includes("insight") || possibleType.includes("intuition")) {
+        calloutClass = "insight";
+        icon = "✨";
+        isKnownType = true;
+      } else if (possibleType.includes("pitfall")) {
+        calloutClass = "pitfall";
+        icon = "⚠️";
+        isKnownType = true;
+      } else if (possibleType.includes("example") || possibleType.includes("problem") || possibleType.includes("exercise")) {
+        calloutClass = "example";
+        icon = "🔬";
+        isKnownType = true;
+      } else if (possibleType.includes("tip")) {
+        calloutClass = "tip";
+        icon = "💡";
+        isKnownType = true;
+      } else if (possibleType.includes("warning")) {
+        calloutClass = "pitfall"; // Map warning to pitfall
+        icon = "⚠️";
+        isKnownType = true;
+      }
+
+      if (isKnownType) {
+        if (currentCard) {
+          const newTitleLower = parts[0].trim().toLowerCase();
+
+          // If the new title is "Problem" or "Solution" or "Given", treat as content.
+          if (newTitleLower.includes("problem") || newTitleLower.includes("solution") || newTitleLower.includes("given") || newTitleLower.includes("step")) {
+            // Treat as content
+            const cleanLine = line.replace(/^\s*(?:#+\s*)?(?:>\s*)?/, ""); // Remove indentation/blockquote/header
+            currentCard.content.push(cleanLine);
+            continue; // Skip starting a new card
+          }
+        }
+
+        // If we were already in a card (and didn't merge), close it
+        if (currentCard) {
+          processedLines.push(renderCard(currentCard));
+          currentCard = null;
+        }
+
+        // Start new card
+        let title = parts[0].trim();
+        if (parts.length > 1) {
+          title = parts.slice(1).join(":").trim();
+          if (!title) title = parts[0].trim();
+        }
+
+        // The rest of the line might be content
+        // We need to be careful. match[0] is the whole match prefix.
+        let restOfLine = line.substring(cardStartMatch[0].length).trim();
+
+        currentCard = {
+          class: calloutClass,
+          icon: icon,
+          title: title,
+          content: []
+        };
+
+        if (restOfLine) {
+          currentCard.content.push(restOfLine);
+        }
+        continue; // Move to next line
+      }
+    }
+
+    // Check for Card Termination Conditions
+    // 1. Header (### ...)
+    // 2. Horizontal Rule (---)
+    // 3. Double Newline followed by something that looks like a start of a new section? 
+    //    Actually, we want to be greedy. We only stop if we hit a Header or HR.
+    //    Or if we hit another Card Start (handled above).
+
+    if (currentCard) {
+      if (trimmedLine.startsWith("#") || trimmedLine.startsWith("---")) {
+        // Close card
+        processedLines.push(renderCard(currentCard));
+        currentCard = null;
+        processedLines.push(line); // Add the header/hr
+      } else {
+        // Add to current card content
+        // Remove leading > if present (for blockquote style compatibility)
+        const cleanLine = line.replace(/^>\s?/, "");
+        currentCard.content.push(cleanLine);
+      }
+    } else {
+      processedLines.push(line);
+    }
+  }
+
+  // Close any open card at the end
+  if (currentCard) {
+    processedLines.push(renderCard(currentCard));
+  }
+
+  html = processedLines.join("\n");
+
+  function renderCard(card) {
+    const contentText = card.content.join("\n").trim();
+    const processedContent = processMarkdown(contentText);
+    return `<div class="callout ${card.class}"><div class="callout-icon">${card.icon}</div><div class="callout-content"><div class="callout-title">${card.title}</div><div class="callout-text">${processedContent}</div></div></div>`;
+  }
+
+  // 2. Process remaining markdown for the rest of the text
+  html = processMarkdown(html);
+
+  // 3. Restore callouts
+  html = html.replace(/\[\[CALLOUT_(\d+)\]\]/g, (match, index) => {
+    // The placeholder might be wrapped in <p> by processMarkdown, so we need to handle that?
+    // processMarkdown checks for <div... but our placeholder is [[CALLOUT_X]].
+    // So it WILL be wrapped in <p>[[CALLOUT_X]]</p>.
+    // We should strip the <p> tags if they exist around the placeholder.
+    return callouts[parseInt(index)];
+  });
+
+  // Cleanup <p> wrapping around callouts if it happened
+  // The replace above puts the div back.
+  // If it was <p>[[CALLOUT_0]]</p>, it becomes <p><div...>...</div></p>.
+  // We need to fix this invalid HTML.
+  html = html.replace(/<p>\s*(<div class="callout".*?<\/div>)\s*<\/p>/gs, "$1");
+
+  return html;
+}
+
+// Helper function to process standard markdown
+function processMarkdown(text) {
+  let html = text;
+
   // Process matrix and code blocks
   html = html.replace(/```(\w*)?\n([\s\S]*?)\n```/g, (match, lang, code) => {
     if (
@@ -950,11 +1101,11 @@ function formatLearningContent(text) {
     ) {
       return convertMatrixToLatex(code);
     } else {
-      const language = lang || "plaintext";
+      lang = lang || "text";
       return `
               <div class="code-block">
                   <div class="code-header">
-                      <span class="code-language">${language}</span>
+                      <span class="code-language">${lang}</span>
                       <div class="code-actions">
                           <button class="code-action-btn">Copy</button>
                       </div>
@@ -965,45 +1116,41 @@ function formatLearningContent(text) {
     }
   });
 
-  // Process headings
+  // Headings
   html = html.replace(/^#### (.*$)/gim, "<h5>$1</h5>");
   html = html.replace(/^### (.*$)/gim, "<h4>$1</h4>");
   html = html.replace(/^## (.*$)/gim, "<h3>$1</h3>");
   html = html.replace(/^# (.*$)/gim, "<h2>$1</h2>");
 
-  // Process bold and italics (but protect LaTeX from being processed)
+  // Bold and Italics
   html = html.replace(/\*\*(?!\$)(.*?)(?<!\$)\*\*/g, "<strong>$1</strong>");
   html = html.replace(/\*(?!\$)(.*?)(?<!\$)\*/g, "<em>$1</em>");
 
-  // Process lists
+  // Lists
   html = html.replace(/^\s*[-*] (.*)/gm, "<ul><li>$1</li></ul>");
   html = html.replace(/<\/ul>\n<ul>/g, "");
 
-  // Process blockquotes
+  // Numbered Lists (Simple support)
+  html = html.replace(/^\s*\d+\.\s+(.*)/gm, "<ol><li>$1</li></ol>");
+  html = html.replace(/<\/ol>\n<ol>/g, "");
+
+  // Blockquotes
   html = html.replace(/^> (.*$)/gim, "<blockquote>$1</blockquote>");
 
-  // Process paragraphs
+  // Paragraphs
   html = html
-    .split("\n")
+    .split("\n\n")
     .map((p) => p.trim())
     .filter((p) => p.length > 0)
     .map((p) => {
-      if (p.startsWith("<") && p.endsWith(">")) return p;
+      if (p.startsWith("<") && p.endsWith(">") && !p.startsWith("<p")) return p;
       if (p.startsWith("$$") || p.includes("$$")) return p;
       if (p.startsWith("$") && p.endsWith("$")) return p;
-      return `<p>${p}</p>`;
+      // Check if it's a placeholder
+      if (p.match(/^\[\[CALLOUT_\d+\]\]$/)) return p;
+      return `<p>${p.replace(/\n/g, "<br>")}</p>`;
     })
-    .join("");
-
-  // Cleanup extra paragraph tags
-  html = html.replace(
-    /<p>(<div class="callout"|<div class="code-block"|<h2>|<h3>|<h4>|<h5>|<ul>|<blockquote>)/g,
-    "$1",
-  );
-  html = html.replace(
-    /(<\/div>|<\/h2>|<\/h3>|<\/h4>|<\/h5>|<\/ul>|<\/blockquote>)<\/p>/g,
-    "$1",
-  );
+    .join("\n\n");
 
   return html;
 }
