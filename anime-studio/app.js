@@ -8,18 +8,30 @@ modeButtons.forEach((button) => {
     // Add active class to clicked button
     button.classList.add("active");
 
-    // Reading Mode integration
-    if (button.textContent.trim() === "Reading Mode") {
-      // Only replace main content area
-      const mainContent = document.querySelector("main.main-content");
-      if (mainContent) {
-        import("./reading-mode/pdfViewer.js").then((module) => {
-          module.setupReadingMode(mainContent);
-        });
+    const mode = button.textContent.trim();
+    const mainContent = document.querySelector("main.main-content");
+    const activeSubtopic = document.querySelector(".subtopic-item.active");
+    const subtopicId = activeSubtopic ? activeSubtopic.dataset.id : null;
+
+    if (!mainContent) return;
+
+    if (mode === "Reading Mode") {
+      import("./reading-mode/pdfViewer.js").then((module) => {
+        module.setupReadingMode(mainContent);
+      });
+    } else if (mode === "Revision Mode") {
+      import("./revision.js").then((module) => {
+        module.setupRevisionMode(mainContent, subtopicId);
+      });
+    } else if (mode === "Learning Mode") {
+      // Restore Learning Mode content
+      if (subtopicId) {
+        // If a subtopic is selected, show its content
+        showSubtopicLearningContent(activeSubtopic);
+      } else {
+        // Otherwise show the default welcome message
+        showMainContent();
       }
-    } else {
-      // Restore main content for other modes
-      window.location.reload(); // Simple restore, can be improved
     }
   });
 });
@@ -795,9 +807,8 @@ function displayGeneratedContent(content, subtopicName) {
   const contentHtml = `
     <div class="generated-content-narrative">
 
-      ${
-        content.story
-          ? `
+      ${content.story
+      ? `
         <div class="story-section callout info">
             <div class="callout-icon">💡</div>
             <div class="callout-content">
@@ -806,23 +817,21 @@ function displayGeneratedContent(content, subtopicName) {
             </div>
         </div>
       `
-          : ""
-      }
+      : ""
+    }
 
-      ${
-        content.theory
-          ? `
+      ${content.theory
+      ? `
         <div class="theory-section">
           <h3>Theory & Concepts</h3>
           <div class="content-body">${formatLearningContent(content.theory)}</div>
         </div>
       `
-          : ""
-      }
+      : ""
+    }
 
-      ${
-        content.summary
-          ? `
+      ${content.summary
+      ? `
         <div class="summary-section callout tip">
             <div class="callout-icon">✅</div>
             <div class="callout-content">
@@ -831,8 +840,8 @@ function displayGeneratedContent(content, subtopicName) {
             </div>
         </div>
       `
-          : ""
-      }
+      : ""
+    }
 
     </div>
   `;

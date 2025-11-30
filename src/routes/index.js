@@ -16,5 +16,6 @@ router.use('/learning', learningRoutes);
 router.use('/materials', materialRoutes);
 router.use('/questions', questionRoutes);
 router.use('/progress', progressRoutes);
+router.use('/revision', require('./revision'));
 
 module.exports = router;
