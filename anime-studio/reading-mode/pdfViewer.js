@@ -3,7 +3,7 @@
 
 export function setupReadingMode(mainContent) {
   mainContent.innerHTML = '';
-  
+
   // CRITICAL: Set mainContent to take full available height
   mainContent.style.cssText = `
     display: flex;
@@ -72,7 +72,7 @@ export function setupReadingMode(mainContent) {
     padding: 0 8px;
     scrollbar-width: none;
   `;
-  
+
   // Hide scrollbar
   const hideScrollbarStyle = document.createElement('style');
   hideScrollbarStyle.textContent = `.tab-bar::-webkit-scrollbar { display: none; }`;
@@ -140,48 +140,10 @@ export function setupReadingMode(mainContent) {
     fileInput.value = '';
   };
 
-  // Close/Minimize Button - Minimal
-  const closeBtn = document.createElement('button');
-  closeBtn.innerHTML = `
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <line x1="18" y1="6" x2="6" y2="18"></line>
-      <line x1="6" y1="6" x2="18" y2="18"></line>
-    </svg>
-  `;
-  closeBtn.title = 'Close Reader';
-  closeBtn.style.cssText = `
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    background: transparent;
-    border: none;
-    color: #737373;
-    cursor: pointer;
-    border-radius: 6px;
-    transition: all 0.2s;
-  `;
 
-  closeBtn.onmouseover = () => {
-    closeBtn.style.background = 'rgba(255, 255, 255, 0.05)';
-    closeBtn.style.color = '#e5e5e5';
-  };
-  closeBtn.onmouseout = () => {
-    closeBtn.style.background = 'transparent';
-    closeBtn.style.color = '#737373';
-  };
-
-  closeBtn.onclick = () => {
-    // Cleanup URLs
-    state.tabs.forEach(tab => URL.revokeObjectURL(tab.url));
-    mainContent.innerHTML = '';
-    mainContent.style.cssText = ''; // Reset styles
-    // You can add your own logic to return to previous view
-  };
 
   headerRight.appendChild(addFileBtn);
-  headerRight.appendChild(closeBtn);
+
 
   header.appendChild(headerLeft);
   header.appendChild(tabBar);
@@ -373,17 +335,17 @@ export function setupReadingMode(mainContent) {
 
   function renderViewer() {
     viewerArea.innerHTML = '';
-    
+
     // Update header left section with Extract button
     const headerLeft = container.querySelector('.header-left-placeholder');
     headerLeft.innerHTML = '';
 
     if (!state.activeTabId) {
-      headerLeft.style.display = 'none'; 
+      headerLeft.style.display = 'none';
       viewerArea.appendChild(emptyState);
       return;
     }
-    headerLeft.style.display = 'flex'; 
+    headerLeft.style.display = 'flex';
 
     const tab = state.tabs.find(t => t.id === state.activeTabId);
     if (!tab) return;

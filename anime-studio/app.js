@@ -15,6 +15,9 @@ modeButtons.forEach((button) => {
 
     if (!mainContent) return;
 
+    // Clear any inline styles (fixes scroll freeze when switching from Reading Mode)
+    mainContent.style.cssText = '';
+
     if (mode === "Reading Mode") {
       mainContent.classList.add('reading-mode');
       import("./reading-mode/pdfViewer.js").then((module) => {

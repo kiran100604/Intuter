@@ -44,9 +44,12 @@ async function loadRevisionContent(subtopicId) {
       console.log("Revision content not found (404)");
       statusDiv.textContent = "";
       contentContainer.innerHTML = `
-        <div class="start-revision-section">
-          <p>No revision notes found for this subtopic.</p>
-          <button id="start-revision-btn" class="btn-primary">Generate Revision Notes</button>
+        <div class="learning-options">
+          <div class="start-learning-btn" id="start-revision-btn">
+            <h3>Ready to revise?</h3>
+            <p>Click to generate personalized revision notes for this topic.</p>
+            <button class="btn-primary">Generate Revision Notes</button>
+          </div>
         </div>
       `;
       document.getElementById("start-revision-btn").addEventListener("click", () => {
