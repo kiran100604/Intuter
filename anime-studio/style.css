@@ -587,6 +587,15 @@ body {
     margin: 0 auto;
 }
 
+.main-content.reading-mode {
+    padding: 0;
+    max-width: none;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
 .content-header {
     margin-bottom: 32px;
 }

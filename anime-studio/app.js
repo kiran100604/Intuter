@@ -16,21 +16,25 @@ modeButtons.forEach((button) => {
     if (!mainContent) return;
 
     if (mode === "Reading Mode") {
+      mainContent.classList.add('reading-mode');
       import("./reading-mode/pdfViewer.js").then((module) => {
         module.setupReadingMode(mainContent);
       });
-    } else if (mode === "Revision Mode") {
-      import("./revision.js").then((module) => {
-        module.setupRevisionMode(mainContent, subtopicId);
-      });
-    } else if (mode === "Learning Mode") {
-      // Restore Learning Mode content
-      if (subtopicId) {
-        // If a subtopic is selected, show its content
-        showSubtopicLearningContent(activeSubtopic);
-      } else {
-        // Otherwise show the default welcome message
-        showMainContent();
+    } else {
+      mainContent.classList.remove('reading-mode');
+      if (mode === "Revision Mode") {
+        import("./revision.js").then((module) => {
+          module.setupRevisionMode(mainContent, subtopicId);
+        });
+      } else if (mode === "Learning Mode") {
+        // Restore Learning Mode content
+        if (subtopicId) {
+          // If a subtopic is selected, show its content
+          showSubtopicLearningContent(activeSubtopic);
+        } else {
+          // Otherwise show the default welcome message
+          showMainContent();
+        }
       }
     }
   });
