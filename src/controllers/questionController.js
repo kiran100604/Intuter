@@ -5,18 +5,24 @@ const { answerQuestion } = require('../services/ai/questionAnswerer');
 // User question controller skeleton
 exports.askQuestion = async (req, res, next) => {
   try {
-    const { sessionId, subtopicId, question } = req.body;
+    const { sessionId, subtopicId, question, attachments } = req.body;
     if (!sessionId || !question) return error(res, 'sessionId and question are required', 400);
-    const session = await StudySession.findByPk(sessionId);
+
+    // Validate attachments if present
+    if (attachments && !Array.isArray(attachments)) {
+      return error(res, 'Attachments must be an array', 400);
+    }
+
+    const session = await StudySession.findOne({ where: { sessionId } });
     if (!session) return error(res, 'Session not found', 404);
     let context = '';
     if (subtopicId) {
       const subtopic = await Subtopic.findByPk(subtopicId);
       if (subtopic) context = subtopic.description || '';
     }
-    const answer = await answerQuestion({ question, context });
+    const answer = await answerQuestion({ question, context, attachments });
     const userQuestion = await UserQuestion.create({
-      sessionId: session.id,
+      sessionId: session.sessionId,
       subtopicId,
       question,
       answer,

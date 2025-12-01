@@ -37,190 +37,12 @@ modeButtons.forEach((button) => {
 });
 
 // Chat functionality
-const chatInput = document.querySelector(".chat-input input");
-const sendButton = document.querySelector(".send-btn");
-const chatMessages = document.querySelector(".chat-messages");
+import { ChatManager } from "./chatManager.js";
 
-async function sendMessage() {
-  const message = chatInput.value.trim();
+let chatManager;
 
-  if (message) {
-    // Create user message
-    const userMessage = document.createElement("div");
-    userMessage.className = "chat-message user-message";
-    userMessage.innerHTML = `<div class="message-bubble user-bubble">${message}</div>`;
-    chatMessages.appendChild(userMessage);
-
-    // Clear input
-    chatInput.value = "";
-
-    // Scroll to bottom
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-
-    // --- Start of API call ---
-    const token = localStorage.getItem("token");
-    if (!token) {
-      window.location.href = "login.html";
-      return;
-    }
-
-    // TODO: Implement proper session selection
-    let sessionId = localStorage.getItem("sessionId");
-    if (!sessionId) {
-      try {
-        const sessionsResponse = await fetch(
-          "http://localhost:5000/api/sessions",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
-        if (sessionsResponse.ok) {
-          const sessionsData = await sessionsResponse.json();
-          if (sessionsData.data.sessions.length > 0) {
-            sessionId = sessionsData.data.sessions[0].sessionId;
-            localStorage.setItem("sessionId", sessionId);
-            window.location.reload(); // Reload to fetch topics for the new session
-          } else {
-            // Show session creation form
-            document.getElementById("session-creation").style.display = "block";
-            document
-              .getElementById("session-form")
-              .addEventListener("submit", async (e) => {
-                e.preventDefault();
-                const subjectName =
-                  document.getElementById("subjectName").value;
-                const goal = document.getElementById("goal").value;
-                const outlineFile = document.getElementById("outline").files[0];
-
-                // Show loading state
-                showLoadingState("Creating session...");
-
-                // Create FormData for file upload
-                const formData = new FormData();
-                formData.append("subjectName", subjectName);
-                formData.append("goal", goal);
-                if (outlineFile) {
-                  formData.append("outline", outlineFile);
-                }
-
-                try {
-                  const createSessionResponse = await fetch(
-                    "http://localhost:5000/api/sessions",
-                    {
-                      method: "POST",
-                      headers: {
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: formData,
-                    },
-                  );
-
-                  if (createSessionResponse.ok) {
-                    const newSessionData = await createSessionResponse.json();
-                    localStorage.setItem(
-                      "sessionId",
-                      newSessionData.data.session.sessionId,
-                    );
-
-                    // If blueprint is already generated, show topics directly
-                    if (
-                      newSessionData.data.session.status === "ready" &&
-                      newSessionData.data.session.topicCount > 0
-                    ) {
-                      hideLoadingState();
-                      document.getElementById(
-                        "session-creation",
-                      ).style.display = "none";
-                      // Fetch and show topics
-                      const sessionDetailsResponse = await fetch(
-                        `http://localhost:5000/api/sessions/${newSessionData.data.session.sessionId}`,
-                        { headers: { Authorization: `Bearer ${token}` } },
-                      );
-                      if (sessionDetailsResponse.ok) {
-                        const sessionDetails =
-                          await sessionDetailsResponse.json();
-                        populateSidebar(sessionDetails.data.session.topics);
-                        showMainContent();
-                      }
-                    } else {
-                      // Start polling for blueprint generation
-                      pollSessionGeneration(
-                        newSessionData.data.session.sessionId,
-                      );
-                    }
-                  } else {
-                    hideLoadingState();
-                    const errorData = await createSessionResponse.json();
-                    showErrorMessage(
-                      `Error: ${errorData.message || "Failed to create session"}`,
-                    );
-                  }
-                } catch (error) {
-                  hideLoadingState();
-                  showErrorMessage(
-                    `Error: ${error.message || "Network error occurred"}`,
-                  );
-                }
-              });
-            return;
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching sessions:", error);
-        return;
-      }
-    }
-
-    const activeSubtopic = document.querySelector(".subtopic-item.active");
-    const subtopicId = activeSubtopic ? activeSubtopic.dataset.id : null;
-
-    try {
-      const response = await fetch("http://localhost:5000/api/questions/ask", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          sessionId,
-          subtopicId,
-          question: message,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to ask question");
-      }
-
-      const data = await response.json();
-      const answer = data.userQuestion.answer;
-
-      // Create AI response message
-      const aiMessage = document.createElement("div");
-      aiMessage.className = "chat-message";
-      aiMessage.innerHTML = `<div class="message-bubble">${answer}</div>`;
-      chatMessages.appendChild(aiMessage);
-    } catch (error) {
-      console.error("Error asking question:", error);
-      const aiMessage = document.createElement("div");
-      aiMessage.className = "chat-message";
-      aiMessage.innerHTML = `<div class="message-bubble">Sorry, I encountered an error: ${error.message}</div>`;
-      chatMessages.appendChild(aiMessage);
-    }
-    // --- End of API call ---
-
-    // Scroll to bottom
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  }
-}
-
-sendButton.addEventListener("click", sendMessage);
-
-chatInput.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") {
-    sendMessage();
-  }
+document.addEventListener("DOMContentLoaded", () => {
+  chatManager = new ChatManager();
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -429,6 +251,7 @@ function addDynamicEventListeners() {
       subtopicItems.forEach((sub) => sub.classList.remove("active"));
       item.classList.add("active");
       showSubtopicLearningContent(item);
+      if (chatManager) chatManager.switchToSubtopic(item.dataset.id);
     });
   });
 }

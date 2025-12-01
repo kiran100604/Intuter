@@ -1,270 +1,173 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>INTUTER</title>
-        <link rel="stylesheet" href="style.css" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-            rel="stylesheet"
-        />
-        <link
-            rel="stylesheet"
-            href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
-            integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV"
-            crossorigin="anonymous"
-        />
-        <script
-            defer
-            src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
-            integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8"
-            crossorigin="anonymous"
-        ></script>
-        <script
-            defer
-            src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
-            integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05"
-            crossorigin="anonymous"
-        ></script>
-    </head>
-    <body>
-        <header class="header">
-            <div class="header-left">
-                <div class="logo">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <path
-                            d="M12 2L2 7L12 12L22 7L12 2Z"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        />
-                        <path
-                            d="M2 17L12 22L22 17"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        />
-                        <path
-                            d="M2 12L12 17L22 12"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        />
-                    </svg>
-                    <span>INTUTER</span>
-                </div>
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>INTUTER</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+        integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+        integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8"
+        crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05"
+        crossorigin="anonymous"></script>
+    <!-- Add Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                    <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                    <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                </svg>
+                <span>INTUTER</span>
             </div>
-            <div class="header-center">
-                <div class="mode-buttons">
-                    <button class="mode-btn active">
-                        <span>Learning Mode</span>
-                    </button>
-                    <button class="mode-btn">
-                        <span>Reading Mode</span>
-                    </button>
-                    <button class="mode-btn">
-                        <span>Revision Mode</span>
-                    </button>
-                </div>
-            </div>
-            <div class="header-right">
-                <a href="profile.html" class="btn-primary">Dashboard</a>
-                <button class="theme-toggle">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <circle
-                            cx="12"
-                            cy="12"
-                            r="5"
-                            stroke="currentColor"
-                            stroke-width="2"
-                        />
-                        <line
-                            x1="12"
-                            y1="1"
-                            x2="12"
-                            y2="3"
-                            stroke="currentColor"
-                            stroke-width="2"
-                        />
-                        <line
-                            x1="12"
-                            y1="21"
-                            x2="12"
-                            y2="23"
-                            stroke="currentColor"
-                            stroke-width="2"
-                        />
-                        <line
-                            x1="4.22"
-                            y1="4.22"
-                            x2="5.64"
-                            y2="5.64"
-                            stroke="currentColor"
-                            stroke-width="2"
-                        />
-                        <line
-                            x1="18.36"
-                            y1="18.36"
-                            x2="19.78"
-                            y2="19.78"
-                            stroke="currentColor"
-                            stroke-width="2"
-                        />
-                        <line
-                            x1="1"
-                            y1="12"
-                            x2="3"
-                            y2="12"
-                            stroke="currentColor"
-                            stroke-width="2"
-                        />
-                        <line
-                            x1="21"
-                            y1="12"
-                            x2="23"
-                            y2="12"
-                            stroke="currentColor"
-                            stroke-width="2"
-                        />
-                        <line
-                            x1="4.22"
-                            y1="19.78"
-                            x2="5.64"
-                            y2="18.36"
-                            stroke="currentColor"
-                            stroke-width="2"
-                        />
-                        <line
-                            x1="18.36"
-                            y1="5.64"
-                            x2="19.78"
-                            y2="4.22"
-                            stroke="currentColor"
-                            stroke-width="2"
-                        />
-                    </svg>
+        </div>
+        <div class="header-center">
+            <div class="mode-buttons">
+                <button class="mode-btn active">
+                    <span>Learning Mode</span>
+                </button>
+                <button class="mode-btn">
+                    <span>Reading Mode</span>
+                </button>
+                <button class="mode-btn">
+                    <span>Revision Mode</span>
                 </button>
             </div>
-        </header>
-        <div class="container">
-            <!-- Sidebar -->
-            <aside class="sidebar">
-                <div class="sidebar-section">
-                    <div class="sidebar-label">Topics</div>
-                </div>
-            </aside>
+        </div>
+        <div class="header-right">
+            <a href="profile.html" class="btn-primary">Dashboard</a>
+            <button class="theme-toggle">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2" />
+                    <line x1="12" y1="1" x2="12" y2="3" stroke="currentColor" stroke-width="2" />
+                    <line x1="12" y1="21" x2="12" y2="23" stroke="currentColor" stroke-width="2" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="currentColor" stroke-width="2" />
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="2" />
+                    <line x1="1" y1="12" x2="3" y2="12" stroke="currentColor" stroke-width="2" />
+                    <line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" stroke-width="2" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="currentColor" stroke-width="2" />
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="currentColor" stroke-width="2" />
+                </svg>
+            </button>
+        </div>
+    </header>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-label">Topics</div>
+            </div>
+        </aside>
 
-            <!-- Main Content -->
-            <main class="main-content">
-                <div class="content-header">
-                    <div class="breadcrumb">Getting started</div>
-                    <h1>Welcome to Learning Mode</h1>
-                    <p class="subtitle">Start your learning journey here</p>
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="content-header">
+                <div class="breadcrumb">Getting started</div>
+                <h1>Welcome to Learning Mode</h1>
+                <p class="subtitle">Start your learning journey here</p>
+            </div>
+
+            <div id="session-creation" style="display: none">
+                <h2>Create a new Study Session</h2>
+                <form id="session-form">
+                    <div class="form-group">
+                        <label for="subjectName">Subject Name</label>
+                        <input type="text" id="subjectName" name="subjectName" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="goal">Goal</label>
+                        <input type="text" id="goal" name="goal" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="outline">Course Outline (PDF/DOCX)</label>
+                        <input type="file" id="outline" name="outline"
+                            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                    </div>
+                    <button type="submit" class="btn-primary">
+                        Create Session
+                    </button>
+                </form>
+            </div>
+
+            <div class="content-body">
+                <!-- Pro Tip Callout -->
+                <div class="callout tip">
+                    <div class="callout-icon">💡</div>
+                    <div class="callout-content">
+                        <div class="callout-title">Pro tip:</div>
+                        <div class="callout-text">
+                            Click the "Copy page" button to paste this page
+                            as context to your coding assistant to refactor
+                            your existing server to follow our recommended
+                            specification.
+                        </div>
+                    </div>
                 </div>
 
-                <div id="session-creation" style="display: none">
-                    <h2>Create a new Study Session</h2>
-                    <form id="session-form">
-                        <div class="form-group">
-                            <label for="subjectName">Subject Name</label>
-                            <input
-                                type="text"
-                                id="subjectName"
-                                name="subjectName"
-                                required
-                            />
-                        </div>
-                        <div class="form-group">
-                            <label for="goal">Goal</label>
-                            <input type="text" id="goal" name="goal" required />
-                        </div>
-                        <div class="form-group">
-                            <label for="outline"
-                                >Course Outline (PDF/DOCX)</label
-                            >
-                            <input
-                                type="file"
-                                id="outline"
-                                name="outline"
-                                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            />
-                        </div>
-                        <button type="submit" class="btn-primary">
-                            Create Session
-                        </button>
-                    </form>
+                <!-- Overview Section -->
+                <div class="content-section">
+                    <h2>Overview</h2>
+                    <div class="text-block">
+                        <p>
+                            This guide defines the standard architecture and
+                            conventions for Model Context Protocol (MCP)
+                            servers with streamable HTTP transport. This
+                            structure ensures consistency, maintainability,
+                            and production readiness across all MCP server
+                            implementations.
+                        </p>
+                    </div>
                 </div>
 
-                <div class="content-body">
-                    <!-- Pro Tip Callout -->
-                    <div class="callout tip">
-                        <div class="callout-icon">💡</div>
-                        <div class="callout-content">
-                            <div class="callout-title">Pro tip:</div>
-                            <div class="callout-text">
-                                Click the "Copy page" button to paste this page
-                                as context to your coding assistant to refactor
-                                your existing server to follow our recommended
-                                specification.
+                <!-- Core Principles -->
+                <div class="content-section">
+                    <h2>Core Principles</h2>
+                    <div class="text-block">
+                        <p>
+                            <strong>1. Modular Architecture</strong> - Clear
+                            separation of concerns with dedicated modules
+                            for transport, configuration, and business
+                            logic.
+                        </p>
+                        <p>
+                            <strong>2. Type Safety</strong> - Comprehensive
+                            TypeScript types for all interfaces and data
+                            structures.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Code Example -->
+                <div class="content-section">
+                    <h2>Implementation Guide</h2>
+                    <h3>1. Main Entry Point (<code>src/index.ts</code>)</h3>
+
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">typescript</span>
+                            <div class="code-actions">
+                                <button class="code-action-btn">
+                                    Copy
+                                </button>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Overview Section -->
-                    <div class="content-section">
-                        <h2>Overview</h2>
-                        <div class="text-block">
-                            <p>
-                                This guide defines the standard architecture and
-                                conventions for Model Context Protocol (MCP)
-                                servers with streamable HTTP transport. This
-                                structure ensures consistency, maintainability,
-                                and production readiness across all MCP server
-                                implementations.
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- Core Principles -->
-                    <div class="content-section">
-                        <h2>Core Principles</h2>
-                        <div class="text-block">
-                            <p>
-                                <strong>1. Modular Architecture</strong> - Clear
-                                separation of concerns with dedicated modules
-                                for transport, configuration, and business
-                                logic.
-                            </p>
-                            <p>
-                                <strong>2. Type Safety</strong> - Comprehensive
-                                TypeScript types for all interfaces and data
-                                structures.
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- Code Example -->
-                    <div class="content-section">
-                        <h2>Implementation Guide</h2>
-                        <h3>1. Main Entry Point (<code>src/index.ts</code>)</h3>
-
-                        <div class="code-block">
-                            <div class="code-header">
-                                <span class="code-language">typescript</span>
-                                <div class="code-actions">
-                                    <button class="code-action-btn">
-                                        Copy
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="code-content">
-                                <pre><code><span class="code-comment">#!/usr/bin/env node</span>
+                        <div class="code-content">
+                            <pre><code><span class="code-comment">#!/usr/bin/env node</span>
 
     <span class="code-keyword">import</span> { config <span class="code-keyword">as</span> loadEnv } <span class="code-keyword">from</span> <span class="code-string">'dotenv'</span>;
     loadEnv();
@@ -273,78 +176,65 @@
     <span class="code-keyword">import</span> { parseArgs } <span class="code-keyword">from</span> <span class="code-string">'./cli.js'</span>;
     <span class="code-keyword">import</span> { [Service]Server } <span class="code-keyword">from</span> <span class="code-string">'./server.js'</span>;
     <span class="code-keyword">import</span> { runStdioTransport, startHttpTransport } <span class="code-keyword">from</span> <span class="code-string">'./transport/index.js'</span>;</code></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Warning Callout -->
-                    <div class="callout warning">
-                        <div class="callout-icon">⚠️</div>
-                        <div class="callout-content">
-                            <div class="callout-title">Important:</div>
-                            <div class="callout-text">
-                                Make sure to handle errors appropriately in
-                                production environments.
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Info Callout -->
-                    <div class="callout info">
-                        <div class="callout-icon">ℹ️</div>
-                        <div class="callout-content">
-                            <div class="callout-title">Note:</div>
-                            <div class="callout-text">
-                                You can customize the transport layer based on
-                                your specific requirements.
-                            </div>
                         </div>
                     </div>
                 </div>
-            </main>
 
-            <!-- Right Sidebar -->
-            <aside class="right-sidebar">
-                <div class="right-sidebar-header">
-                    <h3>AI Assistant</h3>
-                </div>
-                <div class="chatbox">
-                    <div class="chat-messages">
-                        <div class="chat-message">
-                            <div class="message-bubble">
-                                Hello! How can I help you today?
-                            </div>
+                <!-- Warning Callout -->
+                <div class="callout warning">
+                    <div class="callout-icon">⚠️</div>
+                    <div class="callout-content">
+                        <div class="callout-title">Important:</div>
+                        <div class="callout-text">
+                            Make sure to handle errors appropriately in
+                            production environments.
                         </div>
                     </div>
-                    <div class="chat-input">
-                        <input type="text" placeholder="Type a message..." />
-                        <button class="send-btn">
-                            <svg
-                                width="20"
-                                height="20"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                            >
-                                <path
-                                    d="M22 2L11 13"
-                                    stroke="currentColor"
-                                    stroke-width="2"
-                                    stroke-linecap="round"
-                                />
-                                <path
-                                    d="M22 2L15 22L11 13L2 9L22 2Z"
-                                    stroke="currentColor"
-                                    stroke-width="2"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                />
-                            </svg>
-                        </button>
+                </div>
+
+                <!-- Info Callout -->
+                <div class="callout info">
+                    <div class="callout-icon">ℹ️</div>
+                    <div class="callout-content">
+                        <div class="callout-title">Note:</div>
+                        <div class="callout-text">
+                            You can customize the transport layer based on
+                            your specific requirements.
+                        </div>
                     </div>
                 </div>
-            </aside>
-        </div>
+            </div>
+        </main>
 
-        <script src="app.js"></script>
-    </body>
+        <!-- Right Sidebar -->
+        <div class="resizer" id="dragMe"></div>
+        <aside class="right-sidebar">
+            <div class="right-sidebar-header">
+                <h3>AI Assistant</h3>
+            </div>
+            <div class="chatbox">
+                <div class="chat-messages">
+                    <div class="chat-message">
+                        <div class="message-bubble">
+                            Hello! How can I help you today?
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-input">
+                    <input type="text" placeholder="Type a message..." />
+                    <button class="send-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                            <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+
 </html>
