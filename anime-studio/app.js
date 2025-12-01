@@ -21,7 +21,7 @@ modeButtons.forEach((button) => {
     if (mode === "Reading Mode") {
       mainContent.classList.add('reading-mode');
       import("./reading-mode/pdfViewer.js").then((module) => {
-        module.setupReadingMode(mainContent);
+        module.setupReadingMode(mainContent, chatManager);
       });
     } else {
       mainContent.classList.remove('reading-mode');

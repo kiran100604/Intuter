@@ -1,7 +1,7 @@
 // reading-mode/pdfViewer.js
-// Enhanced Full-Screen PDF Viewer with Modern UI - FIXED HEIGHT
+// Full PDF.js Viewer with Thumbnail Strip, AI Integration, and Multi-Tab Support
 
-export function setupReadingMode(mainContent) {
+export function setupReadingMode(mainContent, chatManager) {
   mainContent.innerHTML = '';
 
   // CRITICAL: Set mainContent to take full available height
@@ -17,13 +17,15 @@ export function setupReadingMode(mainContent) {
 
   // State
   const state = {
-    tabs: [],
+    tabs: [], // Array of { id, name, file, pdfDoc, pageNum, scale, thumbnailsRendered }
     activeTabId: null,
-    isFullscreen: false,
-    ocrPanelOpen: false
+    canvas: null,
+    ctx: null,
+    pageRendering: false,
+    pageNumPending: null
   };
 
-  // Main Container - Full viewport
+  // Main Container
   const container = document.createElement('div');
   container.className = 'reading-mode-container';
   container.style.cssText = `
@@ -37,7 +39,7 @@ export function setupReadingMode(mainContent) {
     overflow: hidden;
   `;
 
-  // Header Bar - Compact & Modern
+  // Header Bar
   const header = document.createElement('div');
   header.className = 'header-bar';
   header.style.cssText = `
@@ -49,87 +51,71 @@ export function setupReadingMode(mainContent) {
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     min-height: 48px;
     flex-shrink: 0;
-    backdrop-filter: blur(10px);
+    z-index: 10;
   `;
 
+  // Header Controls (Left)
   const headerLeft = document.createElement('div');
-  headerLeft.className = 'header-left-placeholder';
-  headerLeft.style.cssText = `
-    display: none;
-    align-items: center;
-    gap: 12px;
-    min-width: 120px;
-  `;
+  headerLeft.style.cssText = 'display: flex; align-items: center; gap: 12px; min-width: 150px;';
 
-  // Center section - Tabs (Compact)
+  const pageInfo = document.createElement('span');
+  pageInfo.textContent = 'Page 0 / 0';
+  pageInfo.style.cssText = 'color: #a3a3a3; font-size: 13px; font-variant-numeric: tabular-nums;';
+
+  const prevBtn = createNavButton('<', () => onPrevPage());
+  const nextBtn = createNavButton('>', () => onNextPage());
+
+  headerLeft.appendChild(prevBtn);
+  headerLeft.appendChild(pageInfo);
+  headerLeft.appendChild(nextBtn);
+
+  // Tab Bar (Center)
   const tabBar = document.createElement('div');
   tabBar.className = 'tab-bar';
   tabBar.style.cssText = `
     display: flex;
     gap: 4px;
     overflow-x: auto;
-    max-width: 500px;
-    padding: 0 8px;
+    flex: 1;
+    margin: 0 16px;
+    padding: 0 4px;
     scrollbar-width: none;
   `;
-
-  // Hide scrollbar
+  // Hide scrollbar style
   const hideScrollbarStyle = document.createElement('style');
   hideScrollbarStyle.textContent = `.tab-bar::-webkit-scrollbar { display: none; }`;
   document.head.appendChild(hideScrollbarStyle);
 
-  // Right section - Controls
+  // Header Controls (Right)
   const headerRight = document.createElement('div');
-  headerRight.style.cssText = `
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  `;
+  headerRight.style.cssText = 'display: flex; align-items: center; gap: 8px;';
 
-  // Add File Button - Compact & Modern
-  const addFileBtn = document.createElement('button');
-  addFileBtn.innerHTML = `
+  const openFileBtn = document.createElement('button');
+  openFileBtn.innerHTML = `
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M12 5v14M5 12h14"></path>
     </svg>
+    <span style="margin-left: 6px;">Open PDF</span>
   `;
-  addFileBtn.title = 'Open PDF';
-  addFileBtn.style.cssText = `
+  openFileBtn.style.cssText = `
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
+    padding: 6px 12px;
     background: rgba(124, 58, 237, 0.1);
     color: #a78bfa;
     border: 1px solid rgba(124, 58, 237, 0.2);
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
+    border-radius: 6px;
+    font-size: 13px;
     cursor: pointer;
     transition: all 0.2s;
   `;
+  openFileBtn.onclick = () => fileInput.click();
 
-  addFileBtn.onmouseover = () => {
-    addFileBtn.style.background = 'rgba(124, 58, 237, 0.2)';
-    addFileBtn.style.borderColor = 'rgba(124, 58, 237, 0.4)';
-    addFileBtn.style.color = '#c4b5fd';
-  };
-  addFileBtn.onmouseout = () => {
-    addFileBtn.style.background = 'rgba(124, 58, 237, 0.1)';
-    addFileBtn.style.borderColor = 'rgba(124, 58, 237, 0.2)';
-    addFileBtn.style.color = '#a78bfa';
-  };
-
-  // File Input
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
   fileInput.accept = 'application/pdf';
-  fileInput.multiple = true;
+  fileInput.multiple = true; // Allow multiple files
   fileInput.style.display = 'none';
-
-  addFileBtn.onclick = () => fileInput.click();
-
   fileInput.onchange = (e) => {
     const files = Array.from(e.target.files);
     files.forEach(file => {
@@ -140,65 +126,147 @@ export function setupReadingMode(mainContent) {
     fileInput.value = '';
   };
 
-
-
-  headerRight.appendChild(addFileBtn);
-
-
-  header.appendChild(headerLeft);
-  header.appendChild(tabBar);
-  header.appendChild(headerRight);
-
-  // Viewer Area - CRITICAL: Takes remaining height
+  // Main Viewer Area (Canvas)
   const viewerArea = document.createElement('div');
   viewerArea.className = 'viewer-area';
   viewerArea.style.cssText = `
     flex: 1;
     display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    background: #202020;
+    overflow: auto;
+    padding: 20px;
     position: relative;
-    background: #181818;
-    overflow: hidden;
-    min-height: 0;
   `;
+
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = `
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    max-width: 100%;
+  `;
+  state.canvas = canvas;
+  state.ctx = canvas.getContext('2d');
+  viewerArea.appendChild(canvas);
 
   // Empty State
   const emptyState = document.createElement('div');
-  emptyState.className = 'empty-state';
   emptyState.style.cssText = `
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
     color: #666;
-    gap: 20px;
   `;
-
   emptyState.innerHTML = `
-    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="opacity: 0.3;">
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="opacity: 0.3; margin-bottom: 16px;">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
       <polyline points="14 2 14 8 20 8"></polyline>
-      <line x1="12" y1="11" x2="12" y2="17"></line>
-      <line x1="9" y1="14" x2="15" y2="14"></line>
     </svg>
-    <div style="text-align: center;">
-      <p style="font-size: 18px; margin: 0 0 8px 0; color: #999;">No PDF Open</p>
-      <p style="font-size: 14px; margin: 0; color: #666;">Click "Open PDF" to get started</p>
-    </div>
+    <p>No PDF Open</p>
+  `;
+  viewerArea.appendChild(emptyState);
+
+  // Thumbnail Strip
+  const thumbnailStrip = document.createElement('div');
+  thumbnailStrip.className = 'thumbnail-strip';
+  thumbnailStrip.style.cssText = `
+    height: 140px;
+    background: #141414;
+    border-top: 1px solid #2a2a2a;
+    display: none; /* Hidden by default */
+    align-items: center;
+    gap: 12px;
+    padding: 0 20px;
+    overflow-x: auto;
+    flex-shrink: 0;
+    white-space: nowrap;
   `;
 
-  viewerArea.appendChild(emptyState);
+  // Toggle Thumbnails Button
+  const toggleThumbsBtn = document.createElement('button');
+  toggleThumbsBtn.innerHTML = `
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+      <line x1="3" y1="9" x2="21" y2="9"></line>
+      <line x1="9" y1="21" x2="9" y2="9"></line>
+    </svg>
+  `;
+  toggleThumbsBtn.title = "Toggle Page Thumbnails";
+  toggleThumbsBtn.style.cssText = `
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    color: #a3a3a3;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-right: 8px;
+  `;
+
+  toggleThumbsBtn.onclick = () => {
+    const isHidden = thumbnailStrip.style.display === 'none';
+    thumbnailStrip.style.display = isHidden ? 'flex' : 'none';
+    toggleThumbsBtn.style.color = isHidden ? '#a78bfa' : '#a3a3a3';
+    toggleThumbsBtn.style.background = isHidden ? 'rgba(124, 58, 237, 0.1)' : 'transparent';
+  };
+
+  toggleThumbsBtn.onmouseover = () => {
+    if (thumbnailStrip.style.display === 'none') {
+      toggleThumbsBtn.style.color = '#e5e5e5';
+      toggleThumbsBtn.style.background = 'rgba(255, 255, 255, 0.05)';
+    }
+  };
+
+  toggleThumbsBtn.onmouseout = () => {
+    if (thumbnailStrip.style.display === 'none') {
+      toggleThumbsBtn.style.color = '#a3a3a3';
+      toggleThumbsBtn.style.background = 'transparent';
+    }
+  };
+
+  headerRight.appendChild(toggleThumbsBtn);
+  headerRight.appendChild(openFileBtn);
+
+  header.appendChild(headerLeft);
+  header.appendChild(tabBar);
+  header.appendChild(headerRight);
 
   container.appendChild(header);
   container.appendChild(viewerArea);
+  container.appendChild(thumbnailStrip);
   mainContent.appendChild(container);
 
-  // Functions
+  // Helper to create nav buttons
+  function createNavButton(text, onClick) {
+    const btn = document.createElement('button');
+    btn.textContent = text;
+    btn.style.cssText = `
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #e5e5e5;
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    `;
+    btn.onclick = onClick;
+    return btn;
+  }
+
+  // Tab Management Functions
   function renderTabs() {
     tabBar.innerHTML = '';
-
-    state.tabs.forEach((tab, index) => {
+    state.tabs.forEach(tab => {
       const tabEl = document.createElement('div');
       const isActive = tab.id === state.activeTabId;
 
@@ -213,17 +281,9 @@ export function setupReadingMode(mainContent) {
         border-radius: 6px;
         cursor: pointer;
         transition: all 0.15s;
-        min-width: 120px;
-        max-width: 180px;
+        min-width: 100px;
+        max-width: 160px;
         position: relative;
-      `;
-
-      const icon = document.createElement('span');
-      icon.innerHTML = `
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" opacity="0.6">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-        </svg>
       `;
 
       const name = document.createElement('span');
@@ -245,74 +305,58 @@ export function setupReadingMode(mainContent) {
         border: none;
         color: #737373;
         cursor: pointer;
-        font-size: 18px;
+        font-size: 16px;
         padding: 0 2px;
         line-height: 1;
         border-radius: 3px;
-        transition: all 0.15s;
         opacity: ${isActive ? '1' : '0'};
+        transition: opacity 0.2s;
       `;
 
-      closeBtn.onmouseover = (e) => {
-        e.stopPropagation();
-        closeBtn.style.background = 'rgba(255, 255, 255, 0.1)';
-        closeBtn.style.color = '#e5e5e5';
-      };
-      closeBtn.onmouseout = (e) => {
-        e.stopPropagation();
-        closeBtn.style.background = 'transparent';
-        closeBtn.style.color = '#737373';
-      };
+      tabEl.onmouseover = () => { if (!isActive) closeBtn.style.opacity = '1'; };
+      tabEl.onmouseout = () => { if (!isActive) closeBtn.style.opacity = '0'; };
+
       closeBtn.onclick = (e) => {
         e.stopPropagation();
         closeTab(tab.id);
       };
 
-      tabEl.onmouseover = () => {
-        closeBtn.style.opacity = '1';
-        if (!isActive) {
-          tabEl.style.background = 'rgba(255, 255, 255, 0.04)';
-          tabEl.style.borderColor = 'rgba(255, 255, 255, 0.06)';
-        }
-      };
-      tabEl.onmouseout = () => {
-        if (!isActive) {
-          closeBtn.style.opacity = '0';
-          tabEl.style.background = 'transparent';
-          tabEl.style.borderColor = 'transparent';
-        }
-      };
-
       tabEl.onclick = () => switchTab(tab.id);
 
-      tabEl.appendChild(icon);
       tabEl.appendChild(name);
       tabEl.appendChild(closeBtn);
       tabBar.appendChild(tabEl);
     });
   }
 
-  function addTab(file) {
+  async function addTab(file) {
     const id = Date.now().toString() + Math.random();
-    const url = URL.createObjectURL(file);
-    const newTab = {
-      id,
-      name: file.name,
-      file,
-      url,
-      ocrText: null
-    };
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument(arrayBuffer);
 
-    state.tabs.push(newTab);
-    switchTab(id);
+    try {
+      const pdfDoc = await loadingTask.promise;
+      const newTab = {
+        id,
+        name: file.name,
+        file,
+        pdfDoc,
+        pageNum: 1,
+        scale: 1.5,
+        thumbnailsRendered: false
+      };
+
+      state.tabs.push(newTab);
+      switchTab(id);
+    } catch (error) {
+      console.error('Error loading PDF:', error);
+    }
   }
 
   function closeTab(id) {
     const index = state.tabs.findIndex(t => t.id === id);
     if (index === -1) return;
 
-    const tab = state.tabs[index];
-    URL.revokeObjectURL(tab.url);
     state.tabs.splice(index, 1);
 
     if (state.activeTabId === id) {
@@ -321,7 +365,10 @@ export function setupReadingMode(mainContent) {
         switchTab(state.tabs[newIndex].id);
       } else {
         state.activeTabId = null;
-        renderViewer();
+        emptyState.style.display = 'block';
+        pageInfo.textContent = 'Page 0 / 0';
+        state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+        thumbnailStrip.innerHTML = '';
       }
     }
     renderTabs();
@@ -329,292 +376,188 @@ export function setupReadingMode(mainContent) {
 
   function switchTab(id) {
     state.activeTabId = id;
+    const tab = state.tabs.find(t => t.id === id);
+    if (!tab) return;
+
+    emptyState.style.display = 'none';
     renderTabs();
-    renderViewer();
+    renderPage(tab.pageNum);
+
+    // Render thumbnails if not already done for this tab
+    // Or simply re-render them to show correct active state
+    renderThumbnails();
   }
 
-  function renderViewer() {
-    viewerArea.innerHTML = '';
-
-    // Update header left section with Extract button
-    const headerLeft = container.querySelector('.header-left-placeholder');
-    headerLeft.innerHTML = '';
-
-    if (!state.activeTabId) {
-      headerLeft.style.display = 'none';
-      viewerArea.appendChild(emptyState);
-      return;
-    }
-    headerLeft.style.display = 'flex';
-
+  function renderPage(num) {
     const tab = state.tabs.find(t => t.id === state.activeTabId);
     if (!tab) return;
 
-    // Create Extract Button for Header
-    const headerExtractBtn = document.createElement('button');
-    headerExtractBtn.innerHTML = `
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-      </svg>
-      <span>${tab.ocrText ? 'View Text' : 'Extract'}</span>
-    `;
-    headerExtractBtn.style.cssText = `
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      background: ${tab.ocrText ? 'rgba(34, 197, 94, 0.1)' : 'rgba(124, 58, 237, 0.1)'};
-      color: ${tab.ocrText ? '#4ade80' : '#a78bfa'};
-      border: 1px solid ${tab.ocrText ? 'rgba(34, 197, 94, 0.2)' : 'rgba(124, 58, 237, 0.2)'};
-      border-radius: 6px;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all 0.2s;
-      font-weight: 500;
-    `;
+    state.pageRendering = true;
 
-    const headerStatusText = document.createElement('span');
-    headerStatusText.style.cssText = `
-      font-size: 11px;
-      color: #737373;
-    `;
+    tab.pdfDoc.getPage(num).then(function (page) {
+      const viewport = page.getViewport({ scale: tab.scale });
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
 
-    headerLeft.appendChild(headerExtractBtn);
-    headerLeft.appendChild(headerStatusText);
+      const renderContext = {
+        canvasContext: state.ctx,
+        viewport: viewport
+      };
+      const renderTask = page.render(renderContext);
 
-    // Main content container
-    const contentWrapper = document.createElement('div');
-    contentWrapper.style.cssText = `
-      display: flex;
-      flex: 1;
-      width: 100%;
-      height: 100%;
-      position: relative;
-      min-height: 0;
-    `;
-
-    // PDF Container
-    const pdfContainer = document.createElement('div');
-    pdfContainer.style.cssText = `
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      background: #202020;
-      position: relative;
-      height: 100%;
-      min-width: 0;
-    `;
-
-
-    // PDF Iframe - CRITICAL: Takes remaining height
-    const iframe = document.createElement('iframe');
-    iframe.src = tab.url;
-    iframe.style.cssText = `
-      flex: 1;
-      width: 100%;
-      border: none;
-      background: #181818;
-      min-height: 0;
-    `;
-
-    pdfContainer.appendChild(iframe);
-
-    // OCR Side Panel
-    const ocrPanel = document.createElement('div');
-    ocrPanel.style.cssText = `
-      width: 0;
-      background: #1a1a1a;
-      border-left: 1px solid #2a2a2a;
-      display: flex;
-      flex-direction: column;
-      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      overflow: hidden;
-      flex-shrink: 0;
-    `;
-
-    const ocrHeader = document.createElement('div');
-    ocrHeader.style.cssText = `
-      padding: 16px 20px;
-      border-bottom: 1px solid #2a2a2a;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-shrink: 0;
-    `;
-
-    const ocrTitle = document.createElement('div');
-    ocrTitle.textContent = 'Extracted Text';
-    ocrTitle.style.cssText = `
-      font-size: 14px;
-      font-weight: 600;
-      color: #fff;
-    `;
-
-    const closeOcrBtn = document.createElement('button');
-    closeOcrBtn.innerHTML = `
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="18" y1="6" x2="6" y2="18"></line>
-        <line x1="6" y1="6" x2="18" y2="18"></line>
-      </svg>
-    `;
-    closeOcrBtn.style.cssText = `
-      background: none;
-      border: none;
-      color: #666;
-      cursor: pointer;
-      padding: 4px;
-      border-radius: 4px;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-    `;
-    closeOcrBtn.onmouseover = () => {
-      closeOcrBtn.style.background = '#2a2a2a';
-      closeOcrBtn.style.color = '#fff';
-    };
-    closeOcrBtn.onmouseout = () => {
-      closeOcrBtn.style.background = 'transparent';
-      closeOcrBtn.style.color = '#666';
-    };
-    closeOcrBtn.onclick = () => {
-      ocrPanel.style.width = '0';
-      state.ocrPanelOpen = false;
-    };
-
-    ocrHeader.appendChild(ocrTitle);
-    ocrHeader.appendChild(closeOcrBtn);
-
-    const ocrContent = document.createElement('textarea');
-    ocrContent.readOnly = true;
-    ocrContent.value = tab.ocrText || '';
-    ocrContent.style.cssText = `
-      flex: 1;
-      resize: none;
-      border: none;
-      padding: 20px;
-      background: #1a1a1a;
-      color: #e0e0e0;
-      font-family: 'Consolas', 'Monaco', monospace;
-      font-size: 13px;
-      line-height: 1.6;
-      outline: none;
-      min-height: 0;
-    `;
-
-    ocrPanel.appendChild(ocrHeader);
-    ocrPanel.appendChild(ocrContent);
-
-    contentWrapper.appendChild(pdfContainer);
-    contentWrapper.appendChild(ocrPanel);
-    viewerArea.appendChild(contentWrapper);
-
-    // Extract Button Logic (in header)
-    headerExtractBtn.onclick = async () => {
-      if (tab.ocrText) {
-        // Toggle panel
-        if (state.ocrPanelOpen) {
-          ocrPanel.style.width = '0';
-          state.ocrPanelOpen = false;
-        } else {
-          ocrPanel.style.width = '400px';
-          state.ocrPanelOpen = true;
+      renderTask.promise.then(function () {
+        state.pageRendering = false;
+        if (state.pageNumPending !== null) {
+          renderPage(state.pageNumPending);
+          state.pageNumPending = null;
         }
-        return;
-      }
+      });
+    });
 
-      // Extract text
-      headerExtractBtn.disabled = true;
-      headerExtractBtn.style.opacity = '0.6';
-      headerExtractBtn.innerHTML = `
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
-          <circle cx="12" cy="12" r="10"></circle>
-          <path d="M12 6v6l4 2"></path>
-        </svg>
-        <span>Processing...</span>
-      `;
-      headerStatusText.textContent = 'Analyzing...';
-      headerStatusText.style.color = '#a78bfa';
+    pageInfo.textContent = `Page ${num} / ${tab.pdfDoc.numPages}`;
 
-      try {
-        const formData = new FormData();
-        formData.append('file', tab.file);
-
-        const response = await fetch('http://localhost:5000/ocr', {
-          method: 'POST',
-          body: formData
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-          tab.ocrText = result.text.trim();
-          ocrContent.value = tab.ocrText;
-          headerExtractBtn.innerHTML = `
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-            <span>View Text</span>
-          `;
-          headerExtractBtn.style.background = 'rgba(34, 197, 94, 0.1)';
-          headerExtractBtn.style.color = '#4ade80';
-          headerExtractBtn.style.borderColor = 'rgba(34, 197, 94, 0.2)';
-          headerStatusText.textContent = 'Complete';
-          headerStatusText.style.color = '#4ade80';
-          ocrPanel.style.width = '400px';
-          state.ocrPanelOpen = true;
-        } else {
-          headerStatusText.textContent = `Error: ${result.error}`;
-          headerStatusText.style.color = '#f87171';
-          headerExtractBtn.innerHTML = `
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-            </svg>
-            <span>Retry</span>
-          `;
-        }
-      } catch (error) {
-        console.error('OCR Error:', error);
-        headerStatusText.textContent = 'Server error';
-        headerStatusText.style.color = '#f87171';
-        headerExtractBtn.innerHTML = `
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-          </svg>
-          <span>Retry</span>
-        `;
-      } finally {
-        headerExtractBtn.disabled = false;
-        headerExtractBtn.style.opacity = '1';
-      }
-    };
+    // Update active thumbnail style
+    const thumbs = thumbnailStrip.querySelectorAll('.thumbnail-item');
+    thumbs.forEach(t => t.classList.remove('active'));
+    if (thumbs[num - 1]) {
+      thumbs[num - 1].classList.add('active');
+      thumbs[num - 1].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
   }
 
-  // Add spinning animation for loading state
+  function queueRenderPage(num) {
+    if (state.pageRendering) {
+      state.pageNumPending = num;
+    } else {
+      renderPage(num);
+    }
+  }
+
+  function onPrevPage() {
+    const tab = state.tabs.find(t => t.id === state.activeTabId);
+    if (!tab || tab.pageNum <= 1) return;
+    tab.pageNum--;
+    queueRenderPage(tab.pageNum);
+  }
+
+  function onNextPage() {
+    const tab = state.tabs.find(t => t.id === state.activeTabId);
+    if (!tab || tab.pageNum >= tab.pdfDoc.numPages) return;
+    tab.pageNum++;
+    queueRenderPage(tab.pageNum);
+  }
+
+  async function renderThumbnails() {
+    const tab = state.tabs.find(t => t.id === state.activeTabId);
+    if (!tab) return;
+
+    thumbnailStrip.innerHTML = '';
+
+    // Optimization: Render thumbnails only once per tab if possible, 
+    // but for now re-rendering is safer to ensure correct context.
+    // To optimize, we could cache the canvas elements in the tab object.
+
+    for (let i = 1; i <= tab.pdfDoc.numPages; i++) {
+      const page = await tab.pdfDoc.getPage(i);
+      const viewport = page.getViewport({ scale: 0.2 }); // Small scale for thumbnail
+
+      const thumbContainer = document.createElement('div');
+      thumbContainer.className = 'thumbnail-item';
+      if (i === tab.pageNum) thumbContainer.classList.add('active');
+
+      thumbContainer.style.cssText = `
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 6px;
+        transition: background 0.2s;
+      `;
+
+      const thumbCanvas = document.createElement('canvas');
+      thumbCanvas.height = viewport.height;
+      thumbCanvas.width = viewport.width;
+      thumbCanvas.style.cssText = `
+        border: 1px solid #333;
+        border-radius: 2px;
+        background: #fff;
+      `;
+
+      const ctx = thumbCanvas.getContext('2d');
+      await page.render({
+        canvasContext: ctx,
+        viewport: viewport
+      }).promise;
+
+      const label = document.createElement('span');
+      label.textContent = i;
+      label.style.cssText = 'font-size: 11px; color: #737373;';
+
+      thumbContainer.appendChild(thumbCanvas);
+      thumbContainer.appendChild(label);
+
+      thumbContainer.onclick = () => {
+        tab.pageNum = i;
+        queueRenderPage(i);
+
+        // AI Integration: Extract full page image and attach
+        extractPageImage(i);
+      };
+
+      thumbnailStrip.appendChild(thumbContainer);
+    }
+  }
+
+  async function extractPageImage(pageNum) {
+    const tab = state.tabs.find(t => t.id === state.activeTabId);
+    if (!tab) return;
+
+    const page = await tab.pdfDoc.getPage(pageNum);
+    const viewport = page.getViewport({ scale: 1.5 }); // Good quality for AI
+
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = viewport.width;
+    tempCanvas.height = viewport.height;
+
+    await page.render({
+      canvasContext: tempCanvas.getContext('2d'),
+      viewport: viewport
+    }).promise;
+
+    const base64 = tempCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+
+    // Add to chat
+    if (chatManager) {
+      chatManager.addAttachmentFromData(
+        `Page ${pageNum} - ${tab.name}`,
+        'image/jpeg',
+        base64
+      );
+
+      // Optional: Focus chat input
+      const chatInput = document.querySelector('.chat-input input');
+      if (chatInput) chatInput.focus();
+    }
+  }
+
+  // Add styles for active state
   const style = document.createElement('style');
   style.textContent = `
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
+    .thumbnail-item.active {
+      background: rgba(124, 58, 237, 0.1);
     }
-    
-    .tab-bar::-webkit-scrollbar {
-      height: 6px;
+    .thumbnail-item.active canvas {
+      border-color: #7c3aed !important;
+      box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.3);
     }
-    
-    .tab-bar::-webkit-scrollbar-track {
-      background: #1a1a1a;
+    .thumbnail-item.active span {
+      color: #a78bfa !important;
+      font-weight: 600;
     }
-    
-    .tab-bar::-webkit-scrollbar-thumb {
-      background: #3a3a3a;
-      border-radius: 3px;
-    }
-    
-    .tab-bar::-webkit-scrollbar-thumb:hover {
-      background: #4a4a4a;
+    .thumbnail-item:hover {
+      background: rgba(255, 255, 255, 0.05);
     }
   `;
   document.head.appendChild(style);
