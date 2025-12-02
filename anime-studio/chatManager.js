@@ -139,9 +139,9 @@ export class ChatManager {
             // Find subtopic name
             const activeItem = document.querySelector(`.subtopic-item[data-id="${this.activeSubtopicId}"]`);
             const name = activeItem ? activeItem.querySelector("span:last-child").textContent : "Unknown";
-            header.innerHTML = `AI Assistant <span class="context-badge">${name}</span>`;
+            header.innerHTML = `INTUTER AI <span class="context-badge">${name}</span>`;
         } else {
-            header.innerHTML = `AI Assistant`;
+            header.innerHTML = `INTUTER AI`;
         }
     }
 
