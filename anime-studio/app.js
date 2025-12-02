@@ -768,11 +768,11 @@ function formatLearningContent(text) {
     // Check for Card Start
     // Matches: 
     // 1. Optional Indentation/Blockquote/Headers
-    // 2. Optional Emojis
+    // 2. Optional Emojis (Captured in Group 1) - Exclude | to avoid matching table rows
     // 3. Optional Bold markers
-    // 4. Title/Type
+    // 4. Title/Type (Captured in Group 2)
     // 5. Colon
-    const cardStartMatch = line.match(/^\s*(?:#+\s*)?(?:>\s*)?(?:[^\w\s\*]+\s*)*(?:\*\*)?([^\*:]+)(?:\*\*)?[:]/);
+    const cardStartMatch = line.match(/^\s*(?:#+\s*)?(?:>\s*)?([^\w\s\*\|]+)?\s*(?:\*\*)?([^\*:]+)(?:\*\*)?[:]/);
 
     // DEBUG: Log lines that look like cards but fail matching
     if (!cardStartMatch && (line.includes("Key Definition") || line.includes("Pro Tip") || line.includes("Common Pitfall"))) {
@@ -780,22 +780,21 @@ function formatLearningContent(text) {
     }
 
     if (cardStartMatch) {
-      let boldContent = cardStartMatch[1];
-      // Clean up any remaining leading emojis/symbols from the captured group
-      boldContent = boldContent.replace(/^[^\w\s]+\s*/, "");
+      const capturedIcon = cardStartMatch[1] ? cardStartMatch[1].trim() : null;
+      let boldContent = cardStartMatch[2];
 
       const parts = boldContent.split(":");
       const possibleType = parts[0].trim().toLowerCase();
 
       let isKnownType = false;
       let calloutClass = "info";
-      let icon = "💡";
+      let icon = capturedIcon || "💡"; // Use captured icon if available, else default
 
       if (possibleType.includes("definition")) {
         calloutClass = "definition";
         icon = "🔑";
         isKnownType = true;
-      } else if (possibleType.includes("insight") || possibleType.includes("intuition")) {
+      } else if (possibleType.includes("insight") || possibleType.includes("intuition") || possibleType.includes("analogy")) {
         calloutClass = "insight";
         icon = "✨";
         isKnownType = true;
@@ -815,6 +814,11 @@ function formatLearningContent(text) {
         calloutClass = "pitfall"; // Map warning to pitfall
         icon = "⚠️";
         isKnownType = true;
+      } else if (capturedIcon) {
+        // Generic catch-all: If we captured an icon but didn't match a known type,
+        // treat it as a generic card using the captured icon.
+        isKnownType = true;
+        // Keep default calloutClass = "info" and icon = capturedIcon
       }
 
       if (isKnownType) {
@@ -923,6 +927,41 @@ function formatLearningContent(text) {
 function processMarkdown(text) {
   let html = text;
 
+  // Tables
+  // Matches:
+  // | Header | Header |
+  // | --- | --- |
+  // | Cell | Cell |
+  const tableRegex = /^\|(.+)\|\n\|([-:| ]+)\|\n((?:\|.*\|\n?)+)/gm;
+
+  html = html.replace(tableRegex, (match, header, separator, body) => {
+    const headers = header.split("|").map(h => h.trim()).filter(h => h);
+    const rows = body.trim().split("\n");
+
+    const headerHtml = headers.map(h => `<th>${h}</th>`).join("");
+
+    const bodyHtml = rows.map(row => {
+      const cells = row.split("|").filter((c, i, arr) => i > 0 && i < arr.length - 1); // Remove first and last empty splits from |...|
+      // Fallback if split logic is slightly off due to regex
+      const cleanCells = cells.length > 0 ? cells : row.split("|").map(c => c.trim()).filter(c => c);
+
+      return `<tr>${cleanCells.map(c => `<td>${c.trim()}</td>`).join("")}</tr>`;
+    }).join("");
+
+    return `
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>${headerHtml}</tr>
+          </thead>
+          <tbody>
+            ${bodyHtml}
+          </tbody>
+        </table>
+      </div>
+    `;
+  });
+
   // Process matrix and code blocks
   html = html.replace(/```(\w*)?\n([\s\S]*?)\n```/g, (match, lang, code) => {
     if (
@@ -981,6 +1020,8 @@ function processMarkdown(text) {
       return `<p>${p.replace(/\n/g, "<br>")}</p>`;
     })
     .join("\n\n");
+
+
 
   return html;
 }
