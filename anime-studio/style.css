@@ -104,8 +104,10 @@ body {
     color: var(--text-primary);
 }
 
-.logo svg {
-    color: var(--accent-color);
+.logo-img {
+    height: 32px;
+    width: auto;
+    border-radius: 4px;
 }
 
 /* Interactive Content Blocks */
