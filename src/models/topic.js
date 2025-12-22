@@ -17,6 +17,10 @@ module.exports = (sequelize) => {
     coreIntuition: { type: DataTypes.TEXT },
     intuitionGenerated: { type: DataTypes.BOOLEAN, defaultValue: false },
     difficultyLevel: { type: DataTypes.ENUM('beginner', 'intermediate', 'advanced'), defaultValue: 'intermediate' },
+    // Flag for user-added custom topics
+    isCustom: { type: DataTypes.BOOLEAN, defaultValue: false },
+    // Linked concepts from this topic (for knowledge graph)
+    linkedConcepts: { type: DataTypes.JSON, defaultValue: [] },
     createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
   }, {
     sequelize,

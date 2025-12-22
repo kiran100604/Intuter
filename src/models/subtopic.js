@@ -17,6 +17,10 @@ module.exports = (sequelize) => {
     order: { type: DataTypes.INTEGER, defaultValue: 0 },
     description: { type: DataTypes.TEXT },
     estimatedDuration: { type: DataTypes.INTEGER, defaultValue: 30 },
+    // Flag for user-added custom subtopics
+    isCustom: { type: DataTypes.BOOLEAN, defaultValue: false },
+    // Linked concepts from this subtopic
+    linkedConcepts: { type: DataTypes.JSON, defaultValue: [] },
     createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
   }, {
     sequelize,

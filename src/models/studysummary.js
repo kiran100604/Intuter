@@ -12,8 +12,23 @@ module.exports = (sequelize) => {
     sessionId: { type: DataTypes.INTEGER, allowNull: false },
     topicId: { type: DataTypes.INTEGER },
     subtopicId: { type: DataTypes.INTEGER },
-    summaryText: { type: DataTypes.TEXT, allowNull: false },
+    summaryText: { type: DataTypes.TEXT },
     keyPoints: { type: DataTypes.JSON, defaultValue: [] },
+    // User's custom notes and additions
+    userNotes: { type: DataTypes.TEXT },
+    // Rich content resources (images, videos, links)
+    userResources: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+      comment: 'Array of {type: "image"|"video"|"link", url: string, title: string, description: string}'
+    },
+    // Summary type for different use cases
+    summaryType: {
+      type: DataTypes.ENUM('topic', 'subtopic', 'conversation', 'custom'),
+      defaultValue: 'subtopic'
+    },
+    // For conversation summaries
+    originalCount: { type: DataTypes.INTEGER },
     createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
     updatedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
   }, {
