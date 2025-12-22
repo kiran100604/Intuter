@@ -57,7 +57,48 @@ let noteEditor;
 document.addEventListener("DOMContentLoaded", () => {
   chatManager = new ChatManager();
   contentFeedback = new ContentFeedback();
+
+  // Initialize note editor
+  noteEditor = new NoteEditor("notes-container");
+
+  // Setup sidebar tab switching
+  setupSidebarTabs();
 });
+
+// Setup sidebar tabs (Chat / Notes)
+function setupSidebarTabs() {
+  const tabs = document.querySelectorAll(".sidebar-tab");
+  const panels = document.querySelectorAll(".sidebar-panel");
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const targetTab = tab.dataset.tab;
+
+      // Update tab active states
+      tabs.forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+
+      // Update panel visibility
+      panels.forEach((panel) => {
+        if (panel.id === `${targetTab}-panel`) {
+          panel.classList.add("active");
+        } else {
+          panel.classList.remove("active");
+        }
+      });
+
+      // Load notes when notes tab is clicked
+      if (targetTab === "notes" && noteEditor) {
+        const activeSubtopic = document.querySelector(".subtopic-item.active");
+        if (activeSubtopic) {
+          noteEditor.init(activeSubtopic.dataset.id);
+        } else {
+          noteEditor.loadNotes();
+        }
+      }
+    });
+  });
+}
 
 document.addEventListener("DOMContentLoaded", async () => {
   const token = localStorage.getItem("token");
@@ -266,6 +307,8 @@ function addDynamicEventListeners() {
       item.classList.add("active");
       showSubtopicLearningContent(item);
       if (chatManager) chatManager.switchToSubtopic(item.dataset.id);
+      // Initialize notes for this subtopic
+      if (noteEditor) noteEditor.init(item.dataset.id);
     });
   });
 }
