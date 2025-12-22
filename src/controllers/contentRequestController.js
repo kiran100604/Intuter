@@ -359,3 +359,161 @@ exports.explainDifferently = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * AI Action on a specific block - explain, simplify, expand, add examples, regenerate
+ */
+exports.aiAction = async (req, res, next) => {
+  try {
+    const { action, content, blockType, subtopicId, sessionId } = req.body;
+    const userId = req.user.id;
+
+    if (!action || !content) {
+      throw new ValidationError("action and content are required");
+    }
+
+    // Validate session access if provided
+    if (sessionId) {
+      const session = await db.StudySession.findOne({
+        where: { sessionId, userId },
+      });
+      if (!session) {
+        throw new NotFoundError("Session not found or unauthorized");
+      }
+    }
+
+    // Get context if subtopicId provided
+    let context = "";
+    if (subtopicId) {
+      const subtopic = await db.Subtopic.findByPk(subtopicId, {
+        include: [{ model: db.Topic, as: "topic" }],
+      });
+      if (subtopic) {
+        context = `Topic: ${subtopic.topic?.name || "Unknown"}, Subtopic: ${subtopic.name}`;
+      }
+    }
+
+    // Generate content based on action
+    const aiContent = await contentGapService.handleBlockAction({
+      action,
+      content,
+      blockType,
+      context,
+    });
+
+    res.json({
+      success: true,
+      message: "AI action completed",
+      data: {
+        content: aiContent,
+        action,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Generate new content with AI based on user prompt
+ */
+exports.generateContent = async (req, res, next) => {
+  try {
+    const { prompt, style, subtopicId, sessionId } = req.body;
+    const userId = req.user.id;
+
+    if (!prompt) {
+      throw new ValidationError("prompt is required");
+    }
+
+    // Validate session access if provided
+    if (sessionId) {
+      const session = await db.StudySession.findOne({
+        where: { sessionId, userId },
+      });
+      if (!session) {
+        throw new NotFoundError("Session not found or unauthorized");
+      }
+    }
+
+    // Get context if subtopicId provided
+    let context = "";
+    if (subtopicId) {
+      const subtopic = await db.Subtopic.findByPk(subtopicId, {
+        include: [{ model: db.Topic, as: "topic" }],
+      });
+      if (subtopic) {
+        context = `Topic: ${subtopic.topic?.name || "Unknown"}, Subtopic: ${subtopic.name}`;
+      }
+    }
+
+    // Generate content
+    const generatedContent = await contentGapService.generateFromPrompt({
+      prompt,
+      style: style || "first_principles",
+      context,
+    });
+
+    res.json({
+      success: true,
+      message: "Content generated successfully",
+      data: {
+        content: generatedContent,
+        style,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Explain an uploaded image with AI
+ */
+exports.explainImage = async (req, res, next) => {
+  try {
+    const { imageData, subtopicId, sessionId } = req.body;
+    const userId = req.user.id;
+
+    if (!imageData) {
+      throw new ValidationError("imageData is required");
+    }
+
+    // Validate session access if provided
+    if (sessionId) {
+      const session = await db.StudySession.findOne({
+        where: { sessionId, userId },
+      });
+      if (!session) {
+        throw new NotFoundError("Session not found or unauthorized");
+      }
+    }
+
+    // Get context if subtopicId provided
+    let context = "";
+    if (subtopicId) {
+      const subtopic = await db.Subtopic.findByPk(subtopicId, {
+        include: [{ model: db.Topic, as: "topic" }],
+      });
+      if (subtopic) {
+        context = `Topic: ${subtopic.topic?.name || "Unknown"}, Subtopic: ${subtopic.name}`;
+      }
+    }
+
+    // Generate explanation for the image
+    const explanation = await contentGapService.explainImage({
+      imageData,
+      context,
+    });
+
+    res.json({
+      success: true,
+      message: "Image explanation generated",
+      data: {
+        explanation,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

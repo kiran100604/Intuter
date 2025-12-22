@@ -1,0 +1,1335 @@
+/**
+ * BlockEditor - A Notion-like block-based content editor
+ * Allows users to edit content in blocks, add images/videos, and interact with AI
+ */
+
+export class BlockEditor {
+  constructor(containerId, options = {}) {
+    this.containerId = containerId;
+    this.container = null;
+    this.blocks = [];
+    this.subtopicId = null;
+    this.sessionId = localStorage.getItem("sessionId");
+    this.onContentChange = options.onContentChange || (() => {});
+    this.autoSaveTimeout = null;
+
+    // Block types configuration
+    this.blockTypes = {
+      text: { icon: "T", label: "Text", color: "#3b82f6" },
+      heading: { icon: "H", label: "Heading", color: "#8b5cf6" },
+      ai_content: { icon: "AI", label: "AI Generated", color: "#f97316" },
+      image: { icon: "IMG", label: "Image", color: "#10b981" },
+      video: { icon: "VID", label: "Video", color: "#ef4444" },
+      latex: { icon: "fn", label: "Math/LaTeX", color: "#ec4899" },
+      code: { icon: "</>", label: "Code", color: "#06b6d4" },
+      callout: { icon: "!", label: "Callout", color: "#f59e0b" },
+      divider: { icon: "—", label: "Divider", color: "#71717a" }
+    };
+  }
+
+  /**
+   * Initialize the editor with a subtopic
+   */
+  async init(subtopicId, existingContent = null) {
+    this.subtopicId = subtopicId;
+    this.container = document.getElementById(this.containerId);
+
+    if (!this.container) {
+      console.error("BlockEditor: Container not found:", this.containerId);
+      return;
+    }
+
+    // If we have existing content (from AI generation), convert it to blocks
+    if (existingContent && Object.keys(existingContent).length > 0) {
+      this.blocks = this.convertContentToBlocks(existingContent);
+    } else {
+      // Try to load saved blocks from backend
+      const savedBlocks = await this.loadBlocks();
+      if (savedBlocks && savedBlocks.length > 0) {
+        this.blocks = savedBlocks;
+      } else {
+        // Start with an empty text block
+        this.blocks = [this.createBlock("text", "")];
+      }
+    }
+
+    this.render();
+  }
+
+  /**
+   * Convert traditional content format to blocks
+   */
+  convertContentToBlocks(content) {
+    const blocks = [];
+
+    // Add story as intro callout
+    if (content.story) {
+      blocks.push(this.createBlock("callout", content.story, {
+        calloutType: "info",
+        title: "Basic Intro",
+        isAiGenerated: true
+      }));
+    }
+
+    // Add theory section - parse it into multiple blocks
+    if (content.theory) {
+      const theoryBlocks = this.parseContentIntoBlocks(content.theory, true);
+      blocks.push(...theoryBlocks);
+    }
+
+    // Add summary as tip callout
+    if (content.summary) {
+      blocks.push(this.createBlock("callout", content.summary, {
+        calloutType: "tip",
+        title: "Summary",
+        isAiGenerated: true
+      }));
+    }
+
+    return blocks;
+  }
+
+  /**
+   * Parse markdown-like content into blocks
+   */
+  parseContentIntoBlocks(content, isAiGenerated = false) {
+    const blocks = [];
+    const lines = content.split("\n");
+    let currentText = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // Heading detection
+      if (trimmed.startsWith("### ")) {
+        if (currentText.length > 0) {
+          blocks.push(this.createBlock("text", currentText.join("\n"), { isAiGenerated }));
+          currentText = [];
+        }
+        blocks.push(this.createBlock("heading", trimmed.replace("### ", ""), { level: 3, isAiGenerated }));
+        continue;
+      }
+
+      if (trimmed.startsWith("## ")) {
+        if (currentText.length > 0) {
+          blocks.push(this.createBlock("text", currentText.join("\n"), { isAiGenerated }));
+          currentText = [];
+        }
+        blocks.push(this.createBlock("heading", trimmed.replace("## ", ""), { level: 2, isAiGenerated }));
+        continue;
+      }
+
+      // Code block detection
+      if (trimmed.startsWith("```")) {
+        if (currentText.length > 0) {
+          blocks.push(this.createBlock("text", currentText.join("\n"), { isAiGenerated }));
+          currentText = [];
+        }
+
+        const lang = trimmed.replace("```", "").trim() || "text";
+        let codeContent = [];
+        i++;
+        while (i < lines.length && !lines[i].trim().startsWith("```")) {
+          codeContent.push(lines[i]);
+          i++;
+        }
+        blocks.push(this.createBlock("code", codeContent.join("\n"), { language: lang, isAiGenerated }));
+        continue;
+      }
+
+      // LaTeX block detection
+      if (trimmed.startsWith("$$")) {
+        if (currentText.length > 0) {
+          blocks.push(this.createBlock("text", currentText.join("\n"), { isAiGenerated }));
+          currentText = [];
+        }
+
+        let latexContent = [trimmed.replace("$$", "")];
+        if (!trimmed.endsWith("$$") || trimmed === "$$") {
+          i++;
+          while (i < lines.length && !lines[i].trim().endsWith("$$")) {
+            latexContent.push(lines[i]);
+            i++;
+          }
+          if (i < lines.length) {
+            latexContent.push(lines[i].replace("$$", ""));
+          }
+        }
+        blocks.push(this.createBlock("latex", latexContent.join("\n").trim(), { isAiGenerated }));
+        continue;
+      }
+
+      // Callout detection
+      const calloutMatch = trimmed.match(/^(?:>?\s*)?([\u{1F300}-\u{1F9FF}]|[^\w\s])\s*\*\*([^:*]+)(?:\*\*)?:\*?\*?/u);
+      if (calloutMatch) {
+        if (currentText.length > 0) {
+          blocks.push(this.createBlock("text", currentText.join("\n"), { isAiGenerated }));
+          currentText = [];
+        }
+
+        const title = calloutMatch[2].trim();
+        let calloutType = "info";
+        if (title.toLowerCase().includes("definition")) calloutType = "definition";
+        else if (title.toLowerCase().includes("tip") || title.toLowerCase().includes("pro")) calloutType = "tip";
+        else if (title.toLowerCase().includes("warning") || title.toLowerCase().includes("pitfall")) calloutType = "warning";
+        else if (title.toLowerCase().includes("example")) calloutType = "example";
+
+        // Collect callout content
+        let calloutContent = [trimmed.replace(calloutMatch[0], "").trim()];
+        i++;
+        while (i < lines.length && lines[i].trim() && !lines[i].trim().startsWith("#")) {
+          if (lines[i].trim().match(/^(?:>?\s*)?([\u{1F300}-\u{1F9FF}]|[^\w\s])\s*\*\*[^:*]+/u)) {
+            i--;
+            break;
+          }
+          calloutContent.push(lines[i].replace(/^>\s*/, ""));
+          i++;
+        }
+
+        blocks.push(this.createBlock("callout", calloutContent.join("\n").trim(), {
+          calloutType,
+          title,
+          isAiGenerated
+        }));
+        continue;
+      }
+
+      // Divider
+      if (trimmed === "---" || trimmed === "***") {
+        if (currentText.length > 0) {
+          blocks.push(this.createBlock("text", currentText.join("\n"), { isAiGenerated }));
+          currentText = [];
+        }
+        blocks.push(this.createBlock("divider", "", { isAiGenerated }));
+        continue;
+      }
+
+      // Regular text
+      currentText.push(line);
+    }
+
+    // Add remaining text
+    if (currentText.length > 0) {
+      const text = currentText.join("\n").trim();
+      if (text) {
+        blocks.push(this.createBlock("text", text, { isAiGenerated }));
+      }
+    }
+
+    return blocks;
+  }
+
+  /**
+   * Create a new block
+   */
+  createBlock(type, content = "", metadata = {}) {
+    return {
+      id: this.generateId(),
+      type,
+      content,
+      metadata: {
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isAiGenerated: false,
+        ...metadata
+      }
+    };
+  }
+
+  /**
+   * Generate unique ID
+   */
+  generateId() {
+    return `block_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Render the entire editor
+   */
+  render() {
+    if (!this.container) return;
+
+    this.container.innerHTML = `
+      <div class="block-editor">
+        <div class="block-editor-toolbar">
+          <button class="add-block-btn" title="Add block">
+            <span>+</span> Add Block
+          </button>
+          <div class="toolbar-actions">
+            <button class="toolbar-btn save-btn" title="Save changes">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                <polyline points="7 3 7 8 15 8"></polyline>
+              </svg>
+              Save
+            </button>
+          </div>
+        </div>
+        <div class="blocks-container" id="blocks-container">
+          ${this.blocks.map((block, index) => this.renderBlock(block, index)).join("")}
+        </div>
+        ${this.renderAddBlockButton(this.blocks.length)}
+      </div>
+    `;
+
+    this.attachEventListeners();
+    this.renderMathInBlocks();
+  }
+
+  /**
+   * Render a single block
+   */
+  renderBlock(block, index) {
+    const typeConfig = this.blockTypes[block.type] || this.blockTypes.text;
+    const isAi = block.metadata.isAiGenerated;
+
+    let contentHtml = "";
+
+    switch (block.type) {
+      case "text":
+        contentHtml = this.renderTextBlock(block);
+        break;
+      case "heading":
+        contentHtml = this.renderHeadingBlock(block);
+        break;
+      case "ai_content":
+        contentHtml = this.renderAiContentBlock(block);
+        break;
+      case "image":
+        contentHtml = this.renderImageBlock(block);
+        break;
+      case "video":
+        contentHtml = this.renderVideoBlock(block);
+        break;
+      case "latex":
+        contentHtml = this.renderLatexBlock(block);
+        break;
+      case "code":
+        contentHtml = this.renderCodeBlock(block);
+        break;
+      case "callout":
+        contentHtml = this.renderCalloutBlock(block);
+        break;
+      case "divider":
+        contentHtml = this.renderDividerBlock(block);
+        break;
+      default:
+        contentHtml = this.renderTextBlock(block);
+    }
+
+    return `
+      <div class="block-wrapper" data-block-id="${block.id}" data-block-index="${index}">
+        <div class="block-handle" draggable="true" title="Drag to reorder">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="9" cy="6" r="2"></circle>
+            <circle cx="15" cy="6" r="2"></circle>
+            <circle cx="9" cy="12" r="2"></circle>
+            <circle cx="15" cy="12" r="2"></circle>
+            <circle cx="9" cy="18" r="2"></circle>
+            <circle cx="15" cy="18" r="2"></circle>
+          </svg>
+        </div>
+        <div class="block ${block.type}-block ${isAi ? "ai-generated" : ""}" data-type="${block.type}">
+          <div class="block-type-indicator" style="background: ${typeConfig.color}20; color: ${typeConfig.color}">
+            ${typeConfig.icon}
+            ${isAi ? '<span class="ai-badge">AI</span>' : ""}
+          </div>
+          <div class="block-content">
+            ${contentHtml}
+          </div>
+          <div class="block-actions">
+            <button class="block-action-btn ai-action" data-action="ai" title="AI Actions">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/>
+                <path d="M12 6v6l4 2"/>
+              </svg>
+            </button>
+            <button class="block-action-btn edit-action" data-action="edit" title="Edit block">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
+            <button class="block-action-btn delete-action" data-action="delete" title="Delete block">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        ${this.renderAddBlockButton(index + 1)}
+      </div>
+    `;
+  }
+
+  renderTextBlock(block) {
+    return `
+      <div class="text-content" contenteditable="true" data-placeholder="Type something..."
+           data-block-id="${block.id}">${this.formatMarkdown(block.content)}</div>
+    `;
+  }
+
+  renderHeadingBlock(block) {
+    const level = block.metadata.level || 2;
+    return `
+      <h${level} class="heading-content" contenteditable="true"
+          data-placeholder="Heading..." data-block-id="${block.id}">${block.content}</h${level}>
+    `;
+  }
+
+  renderAiContentBlock(block) {
+    return `
+      <div class="ai-content-wrapper">
+        <div class="ai-content-text">${this.formatMarkdown(block.content)}</div>
+        <div class="ai-content-footer">
+          <span class="ai-generated-label">AI Generated</span>
+          <button class="regenerate-btn" data-block-id="${block.id}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 4v6h-6"></path>
+              <path d="M1 20v-6h6"></path>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            Regenerate
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  renderImageBlock(block) {
+    if (block.content) {
+      return `
+        <div class="image-wrapper">
+          <img src="${block.content}" alt="${block.metadata.caption || "Image"}" class="block-image" />
+          ${block.metadata.caption ? `<div class="image-caption">${block.metadata.caption}</div>` : ""}
+          ${block.metadata.aiExplanation ? `
+            <div class="ai-explanation">
+              <div class="ai-explanation-header">
+                <span class="ai-icon">AI</span>
+                <span>AI Explanation</span>
+              </div>
+              <div class="ai-explanation-content">${this.formatMarkdown(block.metadata.aiExplanation)}</div>
+            </div>
+          ` : `
+            <button class="explain-image-btn" data-block-id="${block.id}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+              Ask AI to explain this
+            </button>
+          `}
+        </div>
+      `;
+    } else {
+      return `
+        <div class="image-upload-zone" data-block-id="${block.id}">
+          <div class="upload-placeholder">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+            <p>Click to upload or drag & drop an image</p>
+            <span class="upload-hint">PNG, JPG, GIF up to 10MB</span>
+          </div>
+          <input type="file" accept="image/*" class="image-file-input" hidden />
+        </div>
+      `;
+    }
+  }
+
+  renderVideoBlock(block) {
+    if (block.content) {
+      // Check if it's a YouTube URL
+      const youtubeMatch = block.content.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+      if (youtubeMatch) {
+        return `
+          <div class="video-wrapper">
+            <iframe src="https://www.youtube.com/embed/${youtubeMatch[1]}"
+                    frameborder="0" allowfullscreen class="block-video"></iframe>
+          </div>
+        `;
+      }
+      return `
+        <div class="video-wrapper">
+          <video src="${block.content}" controls class="block-video"></video>
+        </div>
+      `;
+    } else {
+      return `
+        <div class="video-embed-zone" data-block-id="${block.id}">
+          <div class="embed-placeholder">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <polygon points="23 7 16 12 23 17 23 7"></polygon>
+              <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+            </svg>
+            <input type="text" placeholder="Paste YouTube URL or video link..." class="video-url-input" />
+            <p class="upload-hint">or upload a video file</p>
+          </div>
+          <input type="file" accept="video/*" class="video-file-input" hidden />
+        </div>
+      `;
+    }
+  }
+
+  renderLatexBlock(block) {
+    return `
+      <div class="latex-wrapper">
+        <div class="latex-display" data-latex="${this.escapeHtml(block.content)}">$$${block.content}$$</div>
+        <div class="latex-edit-zone" style="display: none;">
+          <textarea class="latex-editor" data-block-id="${block.id}">${block.content}</textarea>
+        </div>
+      </div>
+    `;
+  }
+
+  renderCodeBlock(block) {
+    const lang = block.metadata.language || "text";
+    return `
+      <div class="code-wrapper">
+        <div class="code-header">
+          <span class="code-language">${lang}</span>
+          <button class="copy-code-btn" title="Copy code">Copy</button>
+        </div>
+        <pre class="code-display"><code class="language-${lang}">${this.escapeHtml(block.content)}</code></pre>
+        <textarea class="code-editor" style="display: none;" data-block-id="${block.id}">${block.content}</textarea>
+      </div>
+    `;
+  }
+
+  renderCalloutBlock(block) {
+    const type = block.metadata.calloutType || "info";
+    const title = block.metadata.title || "Note";
+    const icons = {
+      info: "i",
+      tip: "lightbulb",
+      warning: "alert-triangle",
+      definition: "book-open",
+      example: "code"
+    };
+
+    return `
+      <div class="callout-wrapper callout-${type}">
+        <div class="callout-header">
+          <span class="callout-icon">${this.getCalloutIcon(type)}</span>
+          <span class="callout-title" contenteditable="true" data-block-id="${block.id}" data-field="title">${title}</span>
+        </div>
+        <div class="callout-body" contenteditable="true" data-block-id="${block.id}" data-field="content">${this.formatMarkdown(block.content)}</div>
+      </div>
+    `;
+  }
+
+  getCalloutIcon(type) {
+    const icons = {
+      info: "i",
+      tip: "lightbulb",
+      warning: "!",
+      definition: "key",
+      example: "?"
+    };
+    return icons[type] || "i";
+  }
+
+  renderDividerBlock(block) {
+    return `<hr class="block-divider" />`;
+  }
+
+  renderAddBlockButton(afterIndex) {
+    return `
+      <div class="add-block-inline" data-after-index="${afterIndex}">
+        <button class="add-block-line-btn" title="Add block here">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+    `;
+  }
+
+  /**
+   * Attach event listeners
+   */
+  attachEventListeners() {
+    if (!this.container) return;
+
+    // Add block buttons
+    this.container.querySelectorAll(".add-block-btn, .add-block-line-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const afterIndex = parseInt(e.target.closest("[data-after-index]")?.dataset.afterIndex ?? this.blocks.length);
+        this.showBlockTypeMenu(e.target, afterIndex);
+      });
+    });
+
+    // Save button
+    this.container.querySelector(".save-btn")?.addEventListener("click", () => this.saveBlocks());
+
+    // Block actions
+    this.container.querySelectorAll(".block-action-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const action = btn.dataset.action;
+        const blockWrapper = btn.closest(".block-wrapper");
+        const blockId = blockWrapper?.dataset.blockId;
+
+        if (action === "delete") this.deleteBlock(blockId);
+        else if (action === "edit") this.editBlock(blockId);
+        else if (action === "ai") this.showAiMenu(btn, blockId);
+      });
+    });
+
+    // Contenteditable changes
+    this.container.querySelectorAll("[contenteditable]").forEach((el) => {
+      el.addEventListener("input", (e) => {
+        const blockId = el.dataset.blockId;
+        const field = el.dataset.field || "content";
+        this.updateBlockContent(blockId, field === "content" ? el.innerHTML : el.textContent, field);
+      });
+
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          const blockWrapper = el.closest(".block-wrapper");
+          const blockType = blockWrapper?.querySelector(".block")?.dataset.type;
+
+          // For headings, create new text block
+          if (blockType === "heading") {
+            e.preventDefault();
+            const index = parseInt(blockWrapper.dataset.blockIndex);
+            this.addBlock("text", "", {}, index + 1);
+          }
+        }
+      });
+    });
+
+    // Image upload
+    this.container.querySelectorAll(".image-upload-zone").forEach((zone) => {
+      const input = zone.querySelector(".image-file-input");
+
+      zone.addEventListener("click", () => input?.click());
+      zone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        zone.classList.add("dragover");
+      });
+      zone.addEventListener("dragleave", () => zone.classList.remove("dragover"));
+      zone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        zone.classList.remove("dragover");
+        const file = e.dataTransfer.files[0];
+        if (file) this.handleImageUpload(zone.dataset.blockId, file);
+      });
+
+      input?.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file) this.handleImageUpload(zone.dataset.blockId, file);
+      });
+    });
+
+    // Video URL input
+    this.container.querySelectorAll(".video-url-input").forEach((input) => {
+      input.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          const blockId = input.closest(".video-embed-zone")?.dataset.blockId;
+          this.updateBlockContent(blockId, input.value);
+          this.render();
+        }
+      });
+    });
+
+    // Explain image buttons
+    this.container.querySelectorAll(".explain-image-btn").forEach((btn) => {
+      btn.addEventListener("click", () => this.explainImage(btn.dataset.blockId));
+    });
+
+    // Regenerate buttons
+    this.container.querySelectorAll(".regenerate-btn").forEach((btn) => {
+      btn.addEventListener("click", () => this.regenerateContent(btn.dataset.blockId));
+    });
+
+    // Copy code buttons
+    this.container.querySelectorAll(".copy-code-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const code = btn.closest(".code-wrapper")?.querySelector("code")?.textContent;
+        if (code) {
+          navigator.clipboard.writeText(code);
+          btn.textContent = "Copied!";
+          setTimeout(() => btn.textContent = "Copy", 2000);
+        }
+      });
+    });
+
+    // Drag and drop for reordering
+    this.setupDragAndDrop();
+  }
+
+  /**
+   * Setup drag and drop for block reordering
+   */
+  setupDragAndDrop() {
+    let draggedBlock = null;
+
+    this.container.querySelectorAll(".block-handle").forEach((handle) => {
+      handle.addEventListener("dragstart", (e) => {
+        draggedBlock = handle.closest(".block-wrapper");
+        draggedBlock.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+      });
+
+      handle.addEventListener("dragend", () => {
+        if (draggedBlock) {
+          draggedBlock.classList.remove("dragging");
+          draggedBlock = null;
+        }
+      });
+    });
+
+    const blocksContainer = this.container.querySelector(".blocks-container");
+    if (blocksContainer) {
+      blocksContainer.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        const afterElement = this.getDragAfterElement(blocksContainer, e.clientY);
+        if (draggedBlock) {
+          if (afterElement) {
+            blocksContainer.insertBefore(draggedBlock, afterElement);
+          } else {
+            blocksContainer.appendChild(draggedBlock);
+          }
+        }
+      });
+
+      blocksContainer.addEventListener("drop", (e) => {
+        e.preventDefault();
+        // Update blocks array based on new order
+        const newOrder = Array.from(blocksContainer.querySelectorAll(".block-wrapper"))
+          .map((el) => el.dataset.blockId);
+
+        this.blocks = newOrder.map((id) => this.blocks.find((b) => b.id === id)).filter(Boolean);
+        this.triggerAutoSave();
+      });
+    }
+  }
+
+  getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll(".block-wrapper:not(.dragging)")];
+
+    return draggableElements.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+
+  /**
+   * Show block type selection menu
+   */
+  showBlockTypeMenu(trigger, afterIndex) {
+    // Remove existing menu
+    document.querySelector(".block-type-menu")?.remove();
+
+    const menu = document.createElement("div");
+    menu.className = "block-type-menu";
+    menu.innerHTML = `
+      <div class="block-type-menu-header">Add Block</div>
+      <div class="block-type-options">
+        ${Object.entries(this.blockTypes).map(([type, config]) => `
+          <button class="block-type-option" data-type="${type}">
+            <span class="block-type-icon" style="background: ${config.color}20; color: ${config.color}">${config.icon}</span>
+            <span class="block-type-label">${config.label}</span>
+          </button>
+        `).join("")}
+      </div>
+      <div class="block-type-menu-footer">
+        <button class="ai-generate-btn">
+          <span class="ai-icon">AI</span>
+          Generate with AI
+        </button>
+      </div>
+    `;
+
+    // Position menu
+    const rect = trigger.getBoundingClientRect();
+    menu.style.position = "fixed";
+    menu.style.top = `${rect.bottom + 8}px`;
+    menu.style.left = `${rect.left}px`;
+    document.body.appendChild(menu);
+
+    // Event listeners
+    menu.querySelectorAll(".block-type-option").forEach((option) => {
+      option.addEventListener("click", () => {
+        this.addBlock(option.dataset.type, "", {}, afterIndex);
+        menu.remove();
+      });
+    });
+
+    menu.querySelector(".ai-generate-btn")?.addEventListener("click", () => {
+      this.showAiGenerateDialog(afterIndex);
+      menu.remove();
+    });
+
+    // Close on outside click
+    setTimeout(() => {
+      document.addEventListener("click", function closeMenu(e) {
+        if (!menu.contains(e.target) && e.target !== trigger) {
+          menu.remove();
+          document.removeEventListener("click", closeMenu);
+        }
+      });
+    }, 0);
+  }
+
+  /**
+   * Show AI actions menu
+   */
+  showAiMenu(trigger, blockId) {
+    document.querySelector(".ai-actions-menu")?.remove();
+
+    const block = this.blocks.find((b) => b.id === blockId);
+    if (!block) return;
+
+    const menu = document.createElement("div");
+    menu.className = "ai-actions-menu";
+    menu.innerHTML = `
+      <div class="ai-menu-header">AI Actions</div>
+      <button class="ai-menu-item" data-action="explain">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        Explain this
+      </button>
+      <button class="ai-menu-item" data-action="simplify">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="4" y1="21" x2="4" y2="14"></line>
+          <line x1="4" y1="10" x2="4" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12" y2="3"></line>
+        </svg>
+        Simplify
+      </button>
+      <button class="ai-menu-item" data-action="expand">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <polyline points="9 21 3 21 3 15"></polyline>
+          <line x1="21" y1="3" x2="14" y2="10"></line>
+          <line x1="3" y1="21" x2="10" y2="14"></line>
+        </svg>
+        Expand/Add details
+      </button>
+      <button class="ai-menu-item" data-action="examples">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+          <polyline points="2 17 12 22 22 17"></polyline>
+          <polyline points="2 12 12 17 22 12"></polyline>
+        </svg>
+        Add examples
+      </button>
+      <button class="ai-menu-item" data-action="regenerate">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 4v6h-6"></path>
+          <path d="M1 20v-6h6"></path>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        Regenerate
+      </button>
+    `;
+
+    const rect = trigger.getBoundingClientRect();
+    menu.style.position = "fixed";
+    menu.style.top = `${rect.bottom + 8}px`;
+    menu.style.right = `${window.innerWidth - rect.right}px`;
+    document.body.appendChild(menu);
+
+    menu.querySelectorAll(".ai-menu-item").forEach((item) => {
+      item.addEventListener("click", async () => {
+        const action = item.dataset.action;
+        menu.remove();
+        await this.handleAiAction(blockId, action);
+      });
+    });
+
+    setTimeout(() => {
+      document.addEventListener("click", function closeMenu(e) {
+        if (!menu.contains(e.target)) {
+          menu.remove();
+          document.removeEventListener("click", closeMenu);
+        }
+      });
+    }, 0);
+  }
+
+  /**
+   * Handle AI actions on a block
+   */
+  async handleAiAction(blockId, action) {
+    const block = this.blocks.find((b) => b.id === blockId);
+    if (!block) return;
+
+    const blockElement = this.container.querySelector(`[data-block-id="${blockId}"]`)?.closest(".block-wrapper");
+    if (blockElement) {
+      blockElement.classList.add("processing");
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:5000/api/content-requests/ai-action", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action,
+          content: block.content,
+          blockType: block.type,
+          subtopicId: this.subtopicId,
+          sessionId: this.sessionId
+        })
+      });
+
+      if (!response.ok) throw new Error("AI action failed");
+
+      const result = await response.json();
+      const generatedContent = result.data.content;
+
+      // Handle the response based on action
+      if (action === "explain" || action === "expand" || action === "examples") {
+        // Add new AI block after current block
+        const blockIndex = this.blocks.findIndex((b) => b.id === blockId);
+        this.addBlock("ai_content", generatedContent, { isAiGenerated: true }, blockIndex + 1);
+      } else if (action === "simplify" || action === "regenerate") {
+        // Replace current block content
+        block.content = generatedContent;
+        block.metadata.updatedAt = new Date().toISOString();
+        this.render();
+      }
+    } catch (error) {
+      console.error("AI action error:", error);
+      this.showNotification("AI action failed. Please try again.", "error");
+    } finally {
+      if (blockElement) {
+        blockElement.classList.remove("processing");
+      }
+    }
+  }
+
+  /**
+   * Show AI generate dialog
+   */
+  showAiGenerateDialog(afterIndex) {
+    const dialog = document.createElement("div");
+    dialog.className = "ai-generate-dialog modal";
+    dialog.innerHTML = `
+      <div class="modal-content">
+        <span class="close-button">&times;</span>
+        <h3>Generate Content with AI</h3>
+        <p>Describe what you want the AI to generate:</p>
+        <textarea class="ai-prompt-input" placeholder="e.g., Explain the quadratic formula with examples..."></textarea>
+        <div class="ai-style-options">
+          <label>Teaching Style:</label>
+          <select class="ai-style-select">
+            <option value="first_principles">First Principles</option>
+            <option value="example_driven">Example Driven</option>
+            <option value="step_by_step">Step by Step</option>
+            <option value="visual">Visual/Spatial</option>
+            <option value="analogy_based">Analogy Based</option>
+          </select>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn-secondary cancel-btn">Cancel</button>
+          <button class="btn-primary generate-btn">Generate</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(dialog);
+
+    dialog.querySelector(".close-button").addEventListener("click", () => dialog.remove());
+    dialog.querySelector(".cancel-btn").addEventListener("click", () => dialog.remove());
+    dialog.querySelector(".generate-btn").addEventListener("click", async () => {
+      const prompt = dialog.querySelector(".ai-prompt-input").value;
+      const style = dialog.querySelector(".ai-style-select").value;
+
+      if (!prompt.trim()) {
+        this.showNotification("Please enter a prompt", "error");
+        return;
+      }
+
+      dialog.querySelector(".generate-btn").disabled = true;
+      dialog.querySelector(".generate-btn").textContent = "Generating...";
+
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch("http://localhost:5000/api/content-requests/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            prompt,
+            style,
+            subtopicId: this.subtopicId,
+            sessionId: this.sessionId
+          })
+        });
+
+        if (!response.ok) throw new Error("Generation failed");
+
+        const result = await response.json();
+        this.addBlock("ai_content", result.data.content, { isAiGenerated: true }, afterIndex);
+        dialog.remove();
+      } catch (error) {
+        console.error("AI generation error:", error);
+        this.showNotification("Generation failed. Please try again.", "error");
+        dialog.querySelector(".generate-btn").disabled = false;
+        dialog.querySelector(".generate-btn").textContent = "Generate";
+      }
+    });
+
+    dialog.addEventListener("click", (e) => {
+      if (e.target === dialog) dialog.remove();
+    });
+  }
+
+  /**
+   * Handle image upload
+   */
+  async handleImageUpload(blockId, file) {
+    if (!file.type.startsWith("image/")) {
+      this.showNotification("Please upload an image file", "error");
+      return;
+    }
+
+    // Convert to base64 for now (in production, upload to server)
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      this.updateBlockContent(blockId, e.target.result);
+      this.render();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  /**
+   * Explain image with AI
+   */
+  async explainImage(blockId) {
+    const block = this.blocks.find((b) => b.id === blockId);
+    if (!block || !block.content) return;
+
+    const blockElement = this.container.querySelector(`[data-block-id="${blockId}"]`)?.closest(".block-wrapper");
+    if (blockElement) blockElement.classList.add("processing");
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:5000/api/content-requests/explain-image", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          imageData: block.content,
+          subtopicId: this.subtopicId,
+          sessionId: this.sessionId
+        })
+      });
+
+      if (!response.ok) throw new Error("Image explanation failed");
+
+      const result = await response.json();
+      block.metadata.aiExplanation = result.data.explanation;
+      block.metadata.updatedAt = new Date().toISOString();
+      this.render();
+    } catch (error) {
+      console.error("Image explanation error:", error);
+      this.showNotification("Failed to explain image. Please try again.", "error");
+    } finally {
+      if (blockElement) blockElement.classList.remove("processing");
+    }
+  }
+
+  /**
+   * Add a new block
+   */
+  addBlock(type, content = "", metadata = {}, afterIndex = null) {
+    const newBlock = this.createBlock(type, content, metadata);
+
+    if (afterIndex !== null && afterIndex < this.blocks.length) {
+      this.blocks.splice(afterIndex, 0, newBlock);
+    } else {
+      this.blocks.push(newBlock);
+    }
+
+    this.render();
+    this.triggerAutoSave();
+
+    // Focus new block if it's editable
+    setTimeout(() => {
+      const newBlockEl = this.container.querySelector(`[data-block-id="${newBlock.id}"] [contenteditable]`);
+      newBlockEl?.focus();
+    }, 100);
+
+    return newBlock;
+  }
+
+  /**
+   * Update block content
+   */
+  updateBlockContent(blockId, content, field = "content") {
+    const block = this.blocks.find((b) => b.id === blockId);
+    if (!block) return;
+
+    if (field === "content") {
+      block.content = content;
+    } else if (field === "title" && block.metadata) {
+      block.metadata.title = content;
+    }
+
+    block.metadata.updatedAt = new Date().toISOString();
+    this.triggerAutoSave();
+  }
+
+  /**
+   * Delete a block
+   */
+  deleteBlock(blockId) {
+    const index = this.blocks.findIndex((b) => b.id === blockId);
+    if (index === -1) return;
+
+    // Don't delete if it's the only block
+    if (this.blocks.length === 1) {
+      this.blocks[0].content = "";
+      this.render();
+      return;
+    }
+
+    this.blocks.splice(index, 1);
+    this.render();
+    this.triggerAutoSave();
+  }
+
+  /**
+   * Edit a block (toggle edit mode for special blocks)
+   */
+  editBlock(blockId) {
+    const block = this.blocks.find((b) => b.id === blockId);
+    if (!block) return;
+
+    const blockElement = this.container.querySelector(`[data-block-id="${blockId}"]`)?.closest(".block");
+    if (!blockElement) return;
+
+    if (block.type === "latex") {
+      const display = blockElement.querySelector(".latex-display");
+      const editor = blockElement.querySelector(".latex-edit-zone");
+      const textarea = editor?.querySelector("textarea");
+
+      if (display && editor) {
+        const isEditing = editor.style.display !== "none";
+        display.style.display = isEditing ? "block" : "none";
+        editor.style.display = isEditing ? "none" : "block";
+
+        if (!isEditing && textarea) {
+          textarea.focus();
+          textarea.addEventListener("blur", () => {
+            block.content = textarea.value;
+            display.innerHTML = `$$${textarea.value}$$`;
+            display.style.display = "block";
+            editor.style.display = "none";
+            this.renderMathInBlocks();
+            this.triggerAutoSave();
+          }, { once: true });
+        }
+      }
+    } else if (block.type === "code") {
+      const display = blockElement.querySelector(".code-display");
+      const editor = blockElement.querySelector(".code-editor");
+
+      if (display && editor) {
+        const isEditing = editor.style.display !== "none";
+        display.style.display = isEditing ? "block" : "none";
+        editor.style.display = isEditing ? "none" : "block";
+
+        if (!isEditing) {
+          editor.focus();
+          editor.addEventListener("blur", () => {
+            block.content = editor.value;
+            display.querySelector("code").textContent = editor.value;
+            display.style.display = "block";
+            editor.style.display = "none";
+            this.triggerAutoSave();
+          }, { once: true });
+        }
+      }
+    }
+  }
+
+  /**
+   * Regenerate AI content
+   */
+  async regenerateContent(blockId) {
+    await this.handleAiAction(blockId, "regenerate");
+  }
+
+  /**
+   * Trigger auto-save with debounce
+   */
+  triggerAutoSave() {
+    if (this.autoSaveTimeout) {
+      clearTimeout(this.autoSaveTimeout);
+    }
+    this.autoSaveTimeout = setTimeout(() => this.saveBlocks(), 2000);
+  }
+
+  /**
+   * Save blocks to backend
+   */
+  async saveBlocks() {
+    if (!this.subtopicId) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://localhost:5000/api/notes/${this.subtopicId}/blocks`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          blocks: this.blocks,
+          sessionId: this.sessionId
+        })
+      });
+
+      if (!response.ok) throw new Error("Save failed");
+
+      this.showNotification("Saved", "success");
+      this.onContentChange(this.blocks);
+    } catch (error) {
+      console.error("Save error:", error);
+      this.showNotification("Failed to save", "error");
+    }
+  }
+
+  /**
+   * Load blocks from backend
+   */
+  async loadBlocks() {
+    if (!this.subtopicId) return null;
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://localhost:5000/api/notes/${this.subtopicId}/blocks`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) return null;
+
+      const result = await response.json();
+      return result.data?.blocks || null;
+    } catch (error) {
+      console.error("Load error:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Render math expressions in blocks
+   */
+  renderMathInBlocks() {
+    if (typeof renderMathInElement === "function") {
+      const container = this.container.querySelector(".blocks-container");
+      if (container) {
+        renderMathInElement(container, {
+          delimiters: [
+            { left: "$$", right: "$$", display: true },
+            { left: "$", right: "$", display: false },
+            { left: "\\[", right: "\\]", display: true },
+            { left: "\\(", right: "\\)", display: false }
+          ]
+        });
+      }
+    }
+  }
+
+  /**
+   * Format markdown to HTML
+   */
+  formatMarkdown(text) {
+    if (!text) return "";
+
+    let html = text;
+
+    // Bold
+    html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    // Italic
+    html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+    // Links
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    // Line breaks
+    html = html.replace(/\n/g, "<br>");
+
+    return html;
+  }
+
+  /**
+   * Escape HTML
+   */
+  escapeHtml(text) {
+    const map = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;"
+    };
+    return text.replace(/[&<>"']/g, (m) => map[m]);
+  }
+
+  /**
+   * Show notification
+   */
+  showNotification(message, type = "info") {
+    const existing = document.querySelector(".block-editor-notification");
+    if (existing) existing.remove();
+
+    const notification = document.createElement("div");
+    notification.className = `block-editor-notification ${type}`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+
+    setTimeout(() => notification.remove(), 3000);
+  }
+
+  /**
+   * Get blocks as content (for compatibility)
+   */
+  getContent() {
+    return {
+      blocks: this.blocks,
+      // Also provide traditional format for backwards compatibility
+      story: this.blocks.filter((b) => b.metadata.calloutType === "info")[0]?.content || "",
+      theory: this.blocks
+        .filter((b) => b.type === "text" || b.type === "heading" || b.type === "ai_content")
+        .map((b) => b.content)
+        .join("\n\n"),
+      summary: this.blocks.filter((b) => b.metadata.calloutType === "tip")[0]?.content || ""
+    };
+  }
+}
+
+// Export for global access
+window.BlockEditor = BlockEditor;

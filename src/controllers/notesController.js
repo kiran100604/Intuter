@@ -496,3 +496,107 @@ exports.quickSave = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Save blocks for a subtopic (used by BlockEditor in main content area)
+ */
+exports.saveSubtopicBlocks = async (req, res, next) => {
+  try {
+    const { subtopicId } = req.params;
+    const userId = req.user.id;
+    const { blocks, sessionId } = req.body;
+
+    if (!blocks || !Array.isArray(blocks)) {
+      throw new ValidationError("blocks array is required");
+    }
+
+    // Validate subtopic access
+    const subtopic = await db.Subtopic.findByPk(subtopicId, {
+      include: [
+        {
+          model: db.Topic,
+          as: "topic",
+          include: [{ model: db.StudySession, as: "session" }],
+        },
+      ],
+    });
+
+    if (!subtopic || subtopic.topic.session.userId !== userId) {
+      throw new NotFoundError("Subtopic not found or unauthorized");
+    }
+
+    // Find or create a UserNote for storing block content
+    const [note, created] = await db.UserNote.findOrCreate({
+      where: {
+        userId,
+        subtopicId,
+        title: "__block_editor_content__", // Special identifier for block editor content
+      },
+      defaults: {
+        userId,
+        sessionId: sessionId || subtopic.topic.session.sessionId,
+        subtopicId,
+        title: "__block_editor_content__",
+        blocks: [],
+      },
+    });
+
+    // Update the blocks
+    await note.update({ blocks });
+
+    res.json({
+      success: true,
+      message: "Blocks saved",
+      data: {
+        noteId: note.id,
+        blockCount: blocks.length,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get blocks for a subtopic (used by BlockEditor)
+ */
+exports.getSubtopicBlocks = async (req, res, next) => {
+  try {
+    const { subtopicId } = req.params;
+    const userId = req.user.id;
+
+    // Validate subtopic access
+    const subtopic = await db.Subtopic.findByPk(subtopicId, {
+      include: [
+        {
+          model: db.Topic,
+          as: "topic",
+          include: [{ model: db.StudySession, as: "session" }],
+        },
+      ],
+    });
+
+    if (!subtopic || subtopic.topic.session.userId !== userId) {
+      throw new NotFoundError("Subtopic not found or unauthorized");
+    }
+
+    // Find the block editor note
+    const note = await db.UserNote.findOne({
+      where: {
+        userId,
+        subtopicId,
+        title: "__block_editor_content__",
+      },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        blocks: note ? note.blocks : null,
+        noteId: note ? note.id : null,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
