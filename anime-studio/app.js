@@ -45,11 +45,18 @@ modeButtons.forEach((button) => {
 
 // Chat functionality
 import { ChatManager } from "./chatManager.js";
+// Content feedback and notes
+import { ContentFeedback } from "./contentFeedback.js";
+import { NoteEditor } from "./noteEditor.js";
+import { KnowledgePopup } from "./knowledgePopup.js";
 
 let chatManager;
+let contentFeedback;
+let noteEditor;
 
 document.addEventListener("DOMContentLoaded", () => {
   chatManager = new ChatManager();
+  contentFeedback = new ContentFeedback();
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -634,6 +641,9 @@ function displayGeneratedContent(content, subtopicName) {
   // Ensure the container is visible
   container.style.display = "block";
 
+  // Get feedback bar HTML from ContentFeedback component
+  const feedbackBarHtml = window.contentFeedback ? window.contentFeedback.createFeedbackBar() : '';
+
   const contentHtml = `
     <div class="generated-content-narrative">
 
@@ -673,6 +683,8 @@ function displayGeneratedContent(content, subtopicName) {
       : ""
     }
 
+      ${feedbackBarHtml}
+
     </div>
   `;
 
@@ -687,6 +699,17 @@ function displayGeneratedContent(content, subtopicName) {
       { left: "\\(", right: "\\)", display: false },
     ],
   });
+
+  // Process knowledge tags to make them clickable
+  if (window.KnowledgePopup && window.KnowledgePopup.processTagsInContent) {
+    window.KnowledgePopup.processTagsInContent(container);
+  }
+
+  // Update content feedback with current subtopic
+  const activeSubtopic = document.querySelector(".subtopic-item.active");
+  if (activeSubtopic && window.contentFeedback) {
+    window.contentFeedback.init(activeSubtopic.dataset.id);
+  }
 
   const mainContent = document.querySelector("main.main-content");
   mainContent.scrollTop = 0;
