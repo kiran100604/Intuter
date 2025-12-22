@@ -1,6 +1,6 @@
 const { RevisionContent, Subtopic } = require("../models");
 const { success, error } = require("../utils/response");
-const { generateRevision } = require("../services/ai/revisionGenerator");
+const { generateRevision, generatePracticeQuestion } = require("../services/ai/revisionGenerator");
 
 exports.generateRevision = async (req, res, next) => {
     try {
@@ -33,6 +33,64 @@ exports.getRevision = async (req, res, next) => {
         if (!content) return error(res, "Revision content not found", 404);
 
         return success(res, { content }, "Revision content fetched successfully");
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.generatePracticeQuestion = async (req, res, next) => {
+    try {
+        const { subtopicId, revisionContent, userQuestion, userImage } = req.body;
+
+        let contentToUse = revisionContent;
+        let revisionRecord = null;
+
+        if (subtopicId) {
+            revisionRecord = await RevisionContent.findOne({ where: { subtopicId } });
+            if (revisionRecord) {
+                contentToUse = revisionRecord.content;
+            }
+        }
+
+        if (!contentToUse) {
+            // Fallback if provided in body but not in DB (edge case)
+            contentToUse = revisionContent;
+        }
+
+        if (!contentToUse) {
+            return error(res, "Revision content is required to generate practice questions", 400);
+        }
+
+        const questionData = await generatePracticeQuestion({
+            revisionContent: contentToUse,
+            userQuestion,
+            userImage
+        });
+
+        // Save to DB if we have a record
+        if (revisionRecord) {
+            const currentQuestions = revisionRecord.practiceQuestions || [];
+            // Add timestamp and ID to question if not present
+            const questionWithMeta = {
+                ...questionData,
+                id: `pq-${Date.now()}`,
+                createdAt: new Date()
+            };
+
+            // Append new question
+            const updatedQuestions = [...currentQuestions, questionWithMeta];
+
+            // Update record
+            revisionRecord.practiceQuestions = updatedQuestions;
+            // Explicitly mark as changed for JSON arrays in some Sequelize versions/dialects
+            revisionRecord.changed('practiceQuestions', true);
+            await revisionRecord.save();
+
+            // Return the question with metadata
+            return success(res, questionWithMeta, "Practice question generated and saved successfully");
+        }
+
+        return success(res, questionData, "Practice question generated successfully (not saved)");
     } catch (err) {
         next(err);
     }

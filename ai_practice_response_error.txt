@@ -1,0 +1,26 @@
+```json
+{
+  "question": "A simplified weather model tracks the weather each day as one of three states: Sunny (S), Cloudy (C), or Rainy (R). Based on historical data, the probabilities of transitioning between these states in a single day are as follows:\n*   If today is Sunny:\n    *   Tomorrow will be Sunny with probability $0.7$\n    *   Tomorrow will be Cloudy with probability $0.2$\n    *   Tomorrow will be Rainy with probability $0.1$\n*   If today is Cloudy:\n    *   Tomorrow will be Sunny with probability $0.3$\n    *   Tomorrow will be Cloudy with probability $0.4$\n    *   Tomorrow will be Rainy with probability $0.3$\n*   If today is Rainy:\n    *   Tomorrow will be Sunny with probability $0.1$\n    *   Tomorrow will be Cloudy with probability $0.3$\n    *   Tomorrow will be Rainy with probability $0.6$\n\nAssume this system behaves as a Discrete-Time Markov Chain.\n\n1.  Explicitly define the state space $S$ for this model.\n2.  Construct the one-step transition probability matrix $P$. Clearly label your rows and columns (e.g., S, C, R).\n3.  Based on the problem description, explain why this system satisfies the Markov Property.\n4.  Using your constructed matrix, verify that two fundamental properties of a valid transition probability matrix hold true.",
+  "answer": "1.  **State Space ($S$)**: The set of all possible weather conditions is $S = \\{\\text{Sunny, Cloudy, Rainy}\\}$. We can also assign numerical indices, for example, $1=\\text{Sunny}$, $2=\\text{Cloudy}$, $3=\\text{Rainy}$.\n\n2.  **Transition Probability Matrix ($P$)**:\n    Let's order the states as Sunny (S), Cloudy (C), Rainy (R). The matrix entries $p_{ij}$ represent the probability of transitioning from state $i$ (row) to state $j$ (column).\n    $$P = \\begin{pmatrix}\n    p_{SS} & p_{SC} & p_{SR} \\\\\n    p_{CS} & p_{CC} & p_{CR} \\\\\n    p_{RS} & p_{RC} & p_{RR}\n    \\end{pmatrix}$$ \n    Plugging in the given probabilities:\n    $$P = \\begin{pmatrix}\n    0.7 & 0.2 & 0.1 \\\\\n    0.3 & 0.4 & 0.3 \\\\\n    0.1 & 0.3 & 0.6\n    \\end{pmatrix}$$ \n    Where the rows and columns correspond to:\n    ```\n               Sunny (1)  Cloudy (2)  Rainy (3)\n    Sunny (1)    0.7        0.2         0.1\n    Cloudy (2)   0.3        0.4         0.3\n    Rainy (3)    0.1        0.3         0.6\n    ```\n\n3.  **Markov Property**: The problem states that the \"probabilities of transitioning between these states in a single day are as follows\" and explicitly gives probabilities based *only* on \"today's\" weather. For example, if it's Sunny today, the probability of tomorrow being Rainy is $0.1$, irrespective of what the weather was two days ago or any other day in the past. This indicates that the future state (tomorrow's weather) depends solely on the current state (today's weather) and not on the past history of states. This \"memoryless\" characteristic is the defining Markov Property.\n\n4.  **Verification of Properties**:\n    *   **Non-negativity of Transition Probabilities ($p_{ij} \\geq 0$)**: \n        All entries in the constructed matrix $P$ are probabilities (values between $0$ and $1$). They are all positive values ($0.7, 0.2, \\dots, 0.6$), satisfying the condition $p_{ij} \\geq 0$ for all $i, j \\in S$.\n    *   **Sum of Row Probabilities equals 1 ($\\sum_{j \\in S} p_{ij} = 1$)**: \n        *   Row 1 (from Sunny): $0.7 + 0.2 + 0.1 = 1.0$\n        *   Row 2 (from Cloudy): $0.3 + 0.4 + 0.3 = 1.0$\n        *   Row 3 (from Rainy): $0.1 + 0.3 + 0.6 = 1.0$\n        Each row sum equals $1$. This confirms that from any given state, the system *must* transition to one of the possible states in the next time step with a total probability of $1$.",
+  "relevantTags": [
+    "#concept-dtmc",
+    "#concept-state-space",
+    "#concept-transition-prob",
+    "#concept-transition-matrix",
+    "#concept-markov-property",
+    "#formula-transition-prob-def",
+    "#formula-row-sum",
+    "#formula-non-negativity",
+    "#def-dtmc",
+    "#def-state-space",
+    "#def-state",
+    "#def-transition-prob",
+    "#def-transition-matrix",
+    "#def-markov-prop",
+    "#tip-row-sum-check",
+    "#tip-indexing-matters",
+    "#tip-markov-intuition",
+    "#tip-abstract-states"
+  ]
+}
+```

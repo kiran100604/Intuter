@@ -1,0 +1,204 @@
+```json
+{
+  "coreIntuition": "Imagine you're exploring a magical city where the weather changes every day, but not randomly. The weather tomorrow depends *only* on the weather today, not on what happened last week. This is a crucial idea in probability, known as the #concept-markov-property.\n\nNow, let's say you're planning a picnic two days from now. You know it's sunny today. What's the chance it will be sunny two days later? You don't just care about the immediate next day; you care about the outcome after multiple steps.\n\nThe problem this concept solves is figuring out these 'multi-step' probabilities. How do you calculate the chance of getting from state A to state B in 'n' steps when you only know the probabilities for 'one' step at a time? It's like trying to predict your final destination after several bus transfers, knowing only the probabilities for each individual bus route.\n\nThe key insight is that you can break down any long journey into smaller, consecutive journeys. To get from state A to state B in, say, 5 steps, you could go from A to an intermediate state K in 2 steps, and then from K to B in the remaining 3 steps. Or, you could go from A to another intermediate state M in 2 steps, then M to B in 3 steps, and so on. The total probability is the sum of probabilities of *all possible ways* to reach your destination, considering every possible intermediate stop. \n\nThink of it as a series of connecting flights. To get from London to Tokyo in two flights, you might go London -> Dubai -> Tokyo, or London -> Frankfurt -> Tokyo. The Chapman-Kolmogorov equations give us the elegant mathematical framework to sum up all these possibilities.\n\nGreat! Now that we understand WHY we need this – to calculate multi-step probabilities by breaking down journeys – let's see HOW we describe these journeys more precisely.",
+  "importantConcepts": [
+    {
+      "id": "#concept-markov-chain",
+      "concept": "Markov Chain",
+      "explanation": "Building on our weather city analogy, a #def-markov-chain is a sequence of random variables (like the weather on consecutive days) where the future state depends *only* on the current state, not on the sequence of events that preceded it. This 'memoryless' property is fundamental and is called the #concept-markov-property. If the weather tomorrow depends only on today's weather, not yesterday's or the day before, you're looking at a Markov chain. This concept is the foundation for everything we'll discuss, as the Chapman-Kolmogorov equations apply specifically to these types of stochastic processes."
+    },
+    {
+      "id": "#concept-state-space",
+      "concept": "State Space (S)",
+      "explanation": "Recall our magical city's weather. The possible weather conditions (Sunny, Cloudy, Rainy) form the #def-state-space. It's simply the set of all possible states or outcomes your Markov Chain can be in. For a Markov chain, this set can be finite (like our weather example) or countably infinite. Understanding your state space is the first step in setting up any Markov Chain problem, as it defines the 'places' you can visit in your journey. We'll use this concept when defining our #def-transition-matrix."
+    },
+    {
+      "id": "#concept-transition-probability",
+      "concept": "One-step Transition Probability",
+      "explanation": "This is the bread and butter of our journey. If you're in a 'Sunny' state today, what's the chance you'll be in a 'Cloudy' state tomorrow? That specific probability is a #def-transition-probability, denoted as $p_{ij}$. It's the probability of moving from state $i$ to state $j$ in exactly one step. These are the fundamental building blocks we use to construct our entire understanding of the chain's dynamics. We'll see how these form the entries of our #concept-transition-matrix."
+    },
+    {
+      "id": "#concept-transition-matrix",
+      "concept": "Transition Matrix (P)",
+      "explanation": "To keep track of all those #concept-transition-probability values, we organize them into a #def-transition-matrix, denoted by $\\\\textbf{P}$. Each row $i$ represents the current state, and each column $j$ represents the next state. So, the entry $p_{ij}$ (row $i$, column $j$) is the probability of moving from state $i$ to state $j$ in one step. Since you *must* go somewhere from state $i$, the probabilities in each row must sum to 1. This matrix is our primary tool for calculating multi-step probabilities using #formula-matrix-power."
+    },
+    {
+      "id": "#concept-n-step-transition-probability",
+      "concept": "n-step Transition Probability",
+      "explanation": "This is where the Chapman-Kolmogorov equations really shine! While #concept-transition-probability tells us about one step, the #def-n-step-prob, denoted $p_{ij}^{(n)}$, tells us the probability of moving from state $i$ to state $j$ in exactly $n$ steps. This is precisely the 'multi-step journey' problem we started with. The Chapman-Kolmogorov equations provide the method to calculate these $n$-step probabilities, often by using the one-step transition matrix repeatedly or by breaking the $n$-step journey into smaller segments. This concept directly leads us to #formula-chapman-kolmogorov-scalar and #formula-chapman-kolmogorov-matrix."
+    }
+  ],
+  "formulas": [
+    {
+      "id": "#formula-one-step-prob-notation",
+      "name": "One-step Transition Probability Notation",
+      "expression": "$$ P(X_{n+1}=j | X_n=i) = p_{ij} $$",
+      "explanation": "This formula formally defines the #def-transition-probability. It states that the probability of being in state $j$ at time $n+1$, given that we were in state $i$ at time $n$, is $p_{ij}$. This is the fundamental building block. Remember our city's weather? $p_{Sunny,Cloudy}$ would be the probability of it being Cloudy tomorrow if it's Sunny today. This is the basis for constructing the #formula-transition-matrix.",
+      "relatedConcepts": ["#concept-transition-probability", "#concept-markov-property"]
+    },
+    {
+      "id": "#formula-transition-matrix",
+      "name": "Transition Matrix (P)",
+      "expression": "$$ \\\\textbf{P} = \\\\begin{pmatrix} p_{11} & p_{12} & \\\\dots & p_{1M} \\\\\\\\ p_{21} & p_{22} & \\\\dots & p_{2M} \\\\\\\\ \\\\vdots & \\\\vdots & \\\\ddots & \\\\vdots \\\\\\\\ p_{M1} & p_{M2} & \\\\dots & p_{MM} \\\\end{pmatrix} $$",
+      "explanation": "Recall #concept-transition-matrix. This is its mathematical form. Each entry $p_{ij}$ is the #formula-one-step-prob-notation. The rows must sum to 1. This matrix is the 'rule book' for how your Markov Chain moves in one step. It's the essential tool for computing #formula-matrix-power to find multi-step probabilities. The size of the matrix is $M \\\\times M$, where $M$ is the number of states in your #def-state-space.",
+      "relatedConcepts": ["#concept-transition-matrix", "#concept-transition-probability", "#concept-state-space"]
+    },
+    {
+      "id": "#formula-chapman-kolmogorov-scalar",
+      "name": "Chapman-Kolmogorov Equations (Scalar Form)",
+      "expression": "$$ p_{ij}^{(n+m)} = \\\\sum_{k \\\\in S} p_{ik}^{(n)} p_{kj}^{(m)} $$",
+      "explanation": "This is the heart of the Chapman-Kolmogorov equations! It states that the probability of going from state $i$ to state $j$ in $n+m$ steps, $p_{ij}^{(n+m)}$, can be found by summing over all possible intermediate states $k$. For each $k$, you multiply the probability of going from $i$ to $k$ in $n$ steps ($p_{ik}^{(n)}$) by the probability of going from $k$ to $j$ in $m$ steps ($p_{kj}^{(m)}$). This perfectly captures our core intuition of breaking a long journey into two smaller segments (an $n$-step journey and an $m$-step journey) and summing over all possible intermediate stops. This formula is crucial when you need to combine probabilities from different 'lengths' of journeys. It directly relates to #concept-n-step-transition-probability and forms the basis for the #formula-chapman-kolmogorov-matrix.",
+      "relatedConcepts": ["#concept-n-step-transition-probability", "#concept-transition-probability", "#concept-state-space"]
+    },
+    {
+      "id": "#formula-chapman-kolmogorov-matrix",
+      "name": "Chapman-Kolmogorov Equations (Matrix Form)",
+      "expression": "$$ \\\\textbf{P}^{(n+m)} = \\\\textbf{P}^{(n)} \\\\textbf{P}^{(m)} $$",
+      "explanation": "This is the elegant matrix equivalent of #formula-chapman-kolmogorov-scalar. It says that the $(n+m)$-step transition matrix, $\\\\textbf{P}^{(n+m)}$, can be found by multiplying the $n$-step transition matrix, $\\\\textbf{P}^{(n)}$, by the $m$-step transition matrix, $\\\\textbf{P}^{(m)}$. This is incredibly powerful because matrix multiplication inherently performs the summation over intermediate states for you! This is often the most practical way to calculate multi-step probabilities, especially when $n$ and $m$ are large. A special and very common case of this is when $m=1$, giving us $\\\\textbf{P}^{(n+1)} = \\\\textbf{P}^{(n)} \\\\textbf{P}$, which leads to #formula-matrix-power.",
+      "relatedConcepts": ["#concept-n-step-transition-probability", "#concept-transition-matrix"]
+    },
+    {
+      "id": "#formula-matrix-power",
+      "name": "n-step Transition Matrix as Matrix Power",
+      "expression": "$$ \\\\textbf{P}^{(n)} = \\\\textbf{P}^n $$",
+      "explanation": "This is a direct consequence of the #formula-chapman-kolmogorov-matrix. If you want to find the $n$-step transition matrix, you simply multiply the one-step transition matrix $\\\\textbf{P}$ by itself $n$ times. So, $\\\\textbf{P}^{(2)} = \\\\textbf{P} \\\\textbf{P}$, $\\\\textbf{P}^{(3)} = \\\\textbf{P} \\\\textbf{P} \\\\textbf{P} = \\\\textbf{P}^{(2)} \\\\textbf{P}$, and so on. This is the most common way to calculate multi-step transition matrices. When to use it? Whenever you need the probabilities for *all* state transitions after $n$ steps. The entry in row $i$, column $j$ of $\\\\textbf{P}^n$ will be $p_{ij}^{(n)}$, the #def-n-step-prob. Remember, matrix multiplication is not commutative, so the order matters!",
+      "relatedConcepts": ["#concept-n-step-transition-probability", "#concept-transition-matrix", "#formula-chapman-kolmogorov-matrix"]
+    }
+  ],
+  "definitions": [
+    {
+      "id": "#def-markov-chain",
+      "term": "Markov Chain",
+      "formalDefinition": "A stochastic process $\{X_n, n \\\\ge 0\}$ is a Markov Chain if for all states $i, j, i_0, \\\\dots, i_{n-1}$ and for all $n \\\\ge 0$, $P(X_{n+1}=j | X_n=i, X_{n-1}=i_{n-1}, \\\\dots, X_0=i_0) = P(X_{n+1}=j | X_n=i)$.",
+      "intuitiveExplanation": "A sequence of random events where the probability of the next event depends only on the current event, not on any past events before the current one. It has 'no memory' of how it got to its current state. Like our weather, tomorrow's forecast only cares about today's weather.",
+      "usedIn": ["#concept-markov-chain", "#concept-markov-property"]
+    },
+    {
+      "id": "#def-state-space",
+      "term": "State Space (S)",
+      "formalDefinition": "The set of all possible values that the random variable $X_n$ can take. For a discrete-time Markov Chain, this set is typically finite or countably infinite.",
+      "intuitiveExplanation": "All the possible 'conditions' or 'locations' your system can be in. In our weather example, it's {Sunny, Cloudy, Rainy}. In a game, it might be {Player A wins, Player B wins, Draw}.",
+      "usedIn": ["#concept-state-space", "#formula-chapman-kolmogorov-scalar"]
+    },
+    {
+      "id": "#def-transition-probability",
+      "term": "One-step Transition Probability ($p_{ij}$)",
+      "formalDefinition": "The probability of moving from state $i$ to state $j$ in a single time step, denoted $p_{ij} = P(X_{n+1}=j | X_n=i)$.",
+      "intuitiveExplanation": "The chance of going directly from one specific state ($i$) to another specific state ($j$) in just one step. For example, the chance of 'Sunny' becoming 'Cloudy' tomorrow.",
+      "usedIn": ["#concept-transition-probability", "#formula-one-step-prob-notation", "#def-transition-matrix"]
+    },
+    {
+      "id": "#def-transition-matrix",
+      "term": "Transition Matrix (P)",
+      "formalDefinition": "A square matrix $\\\\textbf{P}$ where the entry $p_{ij}$ in row $i$ and column $j$ is the one-step transition probability from state $i$ to state $j$. Each row sum must equal 1.",
+      "intuitiveExplanation": "A table or grid that neatly organizes all the #def-transition-probability values. It's the complete set of rules for single-step movements in your Markov Chain. Think of it as a map showing the direct probability links between all states.",
+      "usedIn": ["#concept-transition-matrix", "#formula-transition-matrix", "#formula-matrix-power"]
+    },
+    {
+      "id": "#def-n-step-prob",
+      "term": "n-step Transition Probability ($p_{ij}^{(n)}$)",
+      "formalDefinition": "The probability of moving from state $i$ to state $j$ in exactly $n$ time steps, denoted $p_{ij}^{(n)} = P(X_{k+n}=j | X_k=i)$.",
+      "intuitiveExplanation": "The chance of getting from state $i$ to state $j$ after exactly $n$ steps or 'time periods'. This is the 'long journey' probability that the Chapman-Kolmogorov equations help us calculate. For example, the chance of 'Sunny' becoming 'Rainy' in 3 days.",
+      "usedIn": ["#concept-n-step-transition-probability", "#formula-chapman-kolmogorov-scalar", "#formula-matrix-power"]
+    },
+    {
+      "id": "#def-chapman-kolmogorov",
+      "term": "Chapman-Kolmogorov Equations",
+      "formalDefinition": "A set of equations that relate the $n$-step transition probabilities to the $m$-step and $(n-m)$-step transition probabilities (or any $n_1$-step and $n_2$-step where $n_1+n_2=n$). Specifically, $p_{ij}^{(n+m)} = \\\\sum_{k \\\\in S} p_{ik}^{(n)} p_{kj}^{(m)}$.",
+      "intuitiveExplanation": "The mathematical rule that allows us to calculate multi-step probabilities by breaking a long journey into shorter segments. It's the formal way of saying that to get from A to B in $N$ steps, you sum up the probabilities of going A to K in $n$ steps, then K to B in $m$ steps, for all possible intermediate states K, where $n+m=N$. This is the core concept we're exploring!",
+      "usedIn": ["#formula-chapman-kolmogorov-scalar", "#formula-chapman-kolmogorov-matrix"]
+    }
+  ],
+  "workedExample": {
+    "problemStatement": "Consider a simplified weather model (a #def-markov-chain) with three states: S (Sunny), C (Cloudy), R (Rainy). The #def-state-space is $S = \\\\{S, C, R\\\\}$. The one-step #def-transition-matrix is given by:\n\n$$ \\\\textbf{P} = \\\\begin{pmatrix}\n0.7 & 0.2 & 0.1 \\\\\\\\\n0.3 & 0.4 & 0.3 \\\\\\\\\n0.2 & 0.3 & 0.5\n\\\\end{pmatrix} \\\\begin{matrix}\nS \\\\\\\\\ C \\\\\\\\\ R\n\\\\end{matrix} \\\\begin{matrix}\nS & C & R\n\\\\end{matrix} $$\n\nIf it is Cloudy today (state C), what is the probability that it will be Sunny in 2 days ($p_{CS}^{(2)}$)? And what is the probability that it will be Sunny in 3 days ($p_{CS}^{(3)}$)?",
+    "solution": "Let's break this down step-by-step, explicitly linking to our concepts and formulas.\n\n**Step 1: Understand the Goal**\nWe need to find $p_{CS}^{(2)}$ and $p_{CS}^{(3)}$. This means we're looking for #def-n-step-prob values. To do this, we'll need to compute the 2-step and 3-step transition matrices, $\\\\textbf{P}^{(2)}$ and $\\\\textbf{P}^{(3)}$.\n\n**Step 2: Calculate the 2-step Transition Matrix, $\\\\textbf{P}^{(2)}$**\nWe know from #formula-matrix-power that $\\\\textbf{P}^{(n)} = \\\\textbf{P}^n$. So, $\\\\textbf{P}^{(2)} = \\\\textbf{P} \\\\textbf{P}$.\n\n$$ \\\\textbf{P}^{(2)} = \\\\textbf{P} \\\\textbf{P} = \\\\begin{pmatrix}\n0.7 & 0.2 & 0.1 \\\\\\\\\n0.3 & 0.4 & 0.3 \\\\\\\\\n0.2 & 0.3 & 0.5\n\\\\end{pmatrix} \\\\begin{pmatrix}\n0.7 & 0.2 & 0.1 \\\\\\\\\n0.3 & 0.4 & 0.3 \\\\\\\\\n0.2 & 0.3 & 0.5\n\\\\end{pmatrix} $$\n\nLet's perform the matrix multiplication. For example, the first element (S to S in 2 steps, $p_{SS}^{(2)}$) is:\n$(0.7 \\\\times 0.7) + (0.2 \\\\times 0.3) + (0.1 \\\\times 0.2) = 0.49 + 0.06 + 0.02 = 0.57$\n\nSimilarly, calculating all elements gives:\n\n$$ \\\\textbf{P}^{(2)} = \\\\begin{pmatrix}\n0.57 & 0.25 & 0.18 \\\\\\\\\n0.41 & 0.29 & 0.30 \\\\\\\\\n0.33 & 0.29 & 0.38\n\\\\end{pmatrix} \\\\begin{matrix}\nS \\\\\\\\\ C \\\\\\\\\ R\n\\\\end{matrix} \\\\begin{matrix}\nS & C & R\n\\\\end{pmatrix} $$\n\n**Step 3: Find $p_{CS}^{(2)}$**\nFrom $\\\\textbf{P}^{(2)}$, the entry in the row corresponding to state C (2nd row) and column corresponding to state S (1st column) is $p_{CS}^{(2)}$.\n\n$p_{CS}^{(2)} = 0.41$\n\nSo, if it is Cloudy today, the probability of it being Sunny in 2 days is 0.41.\n\n**Step 4: Calculate the 3-step Transition Matrix, $\\\\textbf{P}^{(3)}$**\nWe can use the #formula-chapman-kolmogorov-matrix in a special way: $\\\\textbf{P}^{(3)} = \\\\textbf{P}^{(2)} \\\\textbf{P}^{(1)}$ (or simply $\\\\textbf{P}^{(2)} \\\\textbf{P}$).\n\n$$ \\\\textbf{P}^{(3)} = \\\\textbf{P}^{(2)} \\\\textbf{P} = \\\\begin{pmatrix}\n0.57 & 0.25 & 0.18 \\\\\\\\\n0.41 & 0.29 & 0.30 \\\\\\\\\n0.33 & 0.29 & 0.38\n\\\\end{pmatrix} \\\\begin{pmatrix}\n0.7 & 0.2 & 0.1 \\\\\\\\\n0.3 & 0.4 & 0.3 \\\\\\\\\n0.2 & 0.3 & 0.5\n\\\\end{pmatrix} $$\n\nLet's calculate the element $p_{CS}^{(3)}$ directly (2nd row, 1st column of $\\\\textbf{P}^{(3)}$):\n$(0.41 \\\\times 0.7) + (0.29 \\\\times 0.3) + (0.30 \\\\times 0.2) = 0.287 + 0.087 + 0.06 = 0.434$\n\nCalculating all elements (optional for this problem, but good practice):\n\n$$ \\\\textbf{P}^{(3)} = \\\\begin{pmatrix}\n0.499 & 0.271 & 0.230 \\\\\\\\\n0.434 & 0.285 & 0.281 \\\\\\\\\n0.407 & 0.283 & 0.310\n\\\\end{pmatrix} \\\\begin{matrix}\nS \\\\\\\\\ C \\\\\\\\\ R\n\\\\end{pmatrix} \\\\begin{matrix}\nS & C & R\n\\\\end{pmatrix} $$\n\n**Step 5: Find $p_{CS}^{(3)}$**\nFrom $\\\\textbf{P}^{(3)}$, the entry in the row corresponding to state C (2nd row) and column corresponding to state S (1st column) is $p_{CS}^{(3)}$.\n\n$p_{CS}^{(3)} = 0.434$\n\nSo, if it is Cloudy today, the probability of it being Sunny in 3 days is 0.434.",
+    "keyTakeaways": [
+      "The Chapman-Kolmogorov equations (in matrix form, #formula-chapman-kolmogorov-matrix) allow us to easily calculate multi-step transition probabilities by repeatedly multiplying the one-step #def-transition-matrix.",
+      "To find $p_{ij}^{(n)}$, you compute $\\\\textbf{P}^n$ (#formula-matrix-power) and then look at the entry in row $i$ and column $j$.",
+      "Matrix multiplication is non-commutative, so order matters. Always multiply $\\\\textbf{P}^{(n)}$ by $\\\\textbf{P}^{(m)}$ in the correct order to get $\\\\textbf{P}^{(n+m)}$."
+    ],
+    "commonMistakes": [
+      "**Incorrect Matrix Multiplication**: Forgetting the row-by-column rule for matrix multiplication, leading to incorrect entries in $\\\\textbf{P}^{(n)}$. Always double-check your calculations, especially for larger matrices. This can be avoided by careful calculation and understanding the definition of matrix product.",
+      "**Misinterpreting $p_{ij}^{(n)}$**: Confusing $p_{ij}^{(n)}$ with $p_{ji}^{(n)}$ or not understanding that $i$ is the starting state and $j$ is the ending state. Remember: **Row is 'from', Column is 'to'**.",
+      "**Forgetting the Markov Property**: Trying to incorporate past states beyond the current one when calculating probabilities. The #concept-markov-property simplifies things greatly – only $X_n$ matters for $X_{n+1}$.",
+      "**Mathematical Errors**: Simple arithmetic mistakes during the summation for each matrix entry. A calculator is your friend, but understanding the process is key."
+    ]
+  },
+  "quiz": [
+    {
+      "question": "You're tracking a customer's journey through an online store: (Browsing, Adding to Cart, Checkout, Purchased). What fundamental problem do the Chapman-Kolmogorov equations help you solve in this context?",
+      "answer": "The Chapman-Kolmogorov equations help you determine the probability of reaching a specific state (e.g., 'Purchased') from another state (e.g., 'Browsing') after a certain number of steps (e.g., 3 clicks or actions), even though you only know the probabilities for single steps (e.g., Browsing to Adding to Cart). It's about calculating #concept-n-step-transition-probability by breaking the journey into smaller parts, as described by #def-chapman-kolmogorov.",
+      "difficulty": "easy",
+      "testsConcepts": ["#concept-n-step-transition-probability", "#def-chapman-kolmogorov"]
+    },
+    {
+      "question": "If a process is a #def-markov-chain, and you know the current state is 'Adding to Cart', does it matter if the customer 'Browsed' or 'Came from an Ad' before reaching 'Adding to Cart' when predicting their next step ('Checkout')?",
+      "answer": "No, it does not matter. This is the core of the #concept-markov-property. For a Markov Chain, the future (predicting 'Checkout') depends *only* on the present state ('Adding to Cart'), not on how it arrived there ('Browsed' or 'Came from an Ad').",
+      "difficulty": "easy",
+      "testsConcepts": ["#concept-markov-property", "#def-markov-chain"]
+    },
+    {
+      "question": "Consider a simple 2-state Markov chain: A and B. The one-step transition probabilities are $p_{AA}=0.8$, $p_{AB}=0.2$, $p_{BA}=0.6$, $p_{BB}=0.4$. If you are currently in state A, what is the probability of being in state B after 2 steps ($p_{AB}^{(2)}$)? Explain conceptually without full matrix multiplication.",
+      "answer": "To get from A to B in 2 steps, you can take two paths:\n1.  A -> A -> B: Probability is $p_{AA} \\\\times p_{AB} = 0.8 \\\\times 0.2 = 0.16$\n2.  A -> B -> B: Probability is $p_{AB} \\\\times p_{BB} = 0.2 \\\\times 0.4 = 0.08$\nUsing the logic of #formula-chapman-kolmogorov-scalar (summing over intermediate states), $p_{AB}^{(2)} = p_{AA}p_{AB} + p_{AB}p_{BB} = 0.16 + 0.08 = 0.24$. The intermediate states are A and B.",
+      "difficulty": "medium",
+      "testsConcepts": ["#concept-n-step-transition-probability", "#formula-chapman-kolmogorov-scalar"]
+    },
+    {
+      "question": "True or False: The Chapman-Kolmogorov equations only apply to 2-step transitions. Justify your answer.",
+      "answer": "False. The #def-chapman-kolmogorov equations are very general. As shown by #formula-chapman-kolmogorov-scalar, $p_{ij}^{(n+m)} = \\\\sum_{k \\\\in S} p_{ik}^{(n)} p_{kj}^{(m)}$, they apply to any combination of $n$ and $m$ steps. This means you can break down a 10-step journey into a 3-step journey and a 7-step journey, or a 5-step journey and another 5-step journey, and so on. The matrix form #formula-chapman-kolmogorov-matrix also shows this generality.",
+      "difficulty": "medium",
+      "testsConcepts": ["#def-chapman-kolmogorov", "#formula-chapman-kolmogorov-scalar", "#formula-chapman-kolmogorov-matrix"]
+    },
+    {
+      "question": "Given the #def-transition-matrix for the weather model from the example:\n$$ \\\\textbf{P} = \\\\begin{pmatrix}\n0.7 & 0.2 & 0.1 \\\\\\\\\n0.3 & 0.4 & 0.3 \\\\\\\\\n0.2 & 0.3 & 0.5\n\\\\end{pmatrix} $$\nCalculate $\\\\textbf{P}^{(2)}$ using #formula-matrix-power. What is $p_{RS}^{(2)}$ (probability of Rainy to Sunny in 2 days)?",
+      "answer": "Using #formula-matrix-power, $\\\\textbf{P}^{(2)} = \\\\textbf{P} \\\\textbf{P}$.\n$$ \\\\textbf{P}^{(2)} = \\\\begin{pmatrix}\n0.7 & 0.2 & 0.1 \\\\\\\\\n0.3 & 0.4 & 0.3 \\\\\\\\\n0.2 & 0.3 & 0.5\n\\\\end{pmatrix} \\\\begin{pmatrix}\n0.7 & 0.2 & 0.1 \\\\\\\\\n0.3 & 0.4 & 0.3 \\\\\\\\\n0.2 & 0.3 & 0.5\n\\\\end{pmatrix} = \\\\begin{pmatrix}\n0.57 & 0.25 & 0.18 \\\\\\\\\n0.41 & 0.29 & 0.30 \\\\\\\\\n0.33 & 0.29 & 0.38\n\\\\end{pmatrix} $$\n$p_{RS}^{(2)}$ is the element in the 3rd row (R) and 1st column (S) of $\\\\textbf{P}^{(2)}$.\n$p_{RS}^{(2)} = (0.2 \\\\times 0.7) + (0.3 \\\\times 0.3) + (0.5 \\\\times 0.2) = 0.14 + 0.09 + 0.10 = 0.33$.",
+      "difficulty": "medium",
+      "testsConcepts": ["#concept-transition-matrix", "#formula-matrix-power", "#def-n-step-prob"]
+    },
+    {
+      "question": "Using the $\\\\textbf{P}^{(2)}$ from the previous question and the original $\\\\textbf{P}$, calculate $\\\\textbf{P}^{(3)}$ using the #formula-chapman-kolmogorov-matrix. What is $p_{CR}^{(3)}$ (Cloudy to Rainy in 3 days)?",
+      "answer": "We use #formula-chapman-kolmogorov-matrix: $\\\\textbf{P}^{(3)} = \\\\textbf{P}^{(2)} \\\\textbf{P}$.\n$$ \\\\textbf{P}^{(3)} = \\\\begin{pmatrix}\n0.57 & 0.25 & 0.18 \\\\\\\\\n0.41 & 0.29 & 0.30 \\\\\\\\\n0.33 & 0.29 & 0.38\n\\\\end{pmatrix} \\\\begin{pmatrix}\n0.7 & 0.2 & 0.1 \\\\\\\\\n0.3 & 0.4 & 0.3 \\\\\\\\\n0.2 & 0.3 & 0.5\n\\\\end{pmatrix} = \\\\begin{pmatrix}\n0.499 & 0.271 & 0.230 \\\\\\\\\n0.434 & 0.285 & 0.281 \\\\\\\\\n0.407 & 0.283 & 0.310\n\\\\end{pmatrix} $$\n$p_{CR}^{(3)}$ is the element in the 2nd row (C) and 3rd column (R) of $\\\\textbf{P}^{(3)}$.\n$p_{CR}^{(3)} = (0.41 \\\\times 0.1) + (0.29 \\\\times 0.3) + (0.30 \\\\times 0.5) = 0.041 + 0.087 + 0.150 = 0.278$. (Note: my previous calculation in the example had a slight rounding difference, this is more precise).",
+      "difficulty": "hard",
+      "testsConcepts": ["#formula-chapman-kolmogorov-matrix", "#formula-matrix-power", "#def-n-step-prob"]
+    },
+    {
+      "question": "A particle moves between two points, A and B. The #def-transition-matrix is $\\\\textbf{P} = \\\\begin{pmatrix} 0.9 & 0.1 \\\\\\\\ 0.2 & 0.8 \\\\end{pmatrix}$. If the particle starts at A, what is the probability that it will be at B after 4 steps?",
+      "answer": "We need to find $p_{AB}^{(4)}$. This means we need the (A,B) element of $\\\\textbf{P}^{(4)}$. We can calculate $\\\\textbf{P}^{(4)}$ by repeatedly multiplying $\\\\textbf{P}$ by itself using #formula-matrix-power.\n$\\\\textbf{P}^{(2)} = \\\\textbf{P} \\\\textbf{P} = \\\\begin{pmatrix} 0.9 & 0.1 \\\\\\\\ 0.2 & 0.8 \\\\end{pmatrix} \\\\begin{pmatrix} 0.9 & 0.1 \\\\\\\\ 0.2 & 0.8 \\\\end{pmatrix} = \\\\begin{pmatrix} (0.9)(0.9)+(0.1)(0.2) & (0.9)(0.1)+(0.1)(0.8) \\\\\\\\ (0.2)(0.9)+(0.8)(0.2) & (0.2)(0.1)+(0.8)(0.8) \\\\end{pmatrix} = \\\\begin{pmatrix} 0.81+0.02 & 0.09+0.08 \\\\\\\\ 0.18+0.16 & 0.02+0.64 \\\\end{pmatrix} = \\\\begin{pmatrix} 0.83 & 0.17 \\\\\\\\ 0.34 & 0.66 \\\\end{pmatrix}$\n\nNow, $\\\\textbf{P}^{(4)} = \\\\textbf{P}^{(2)} \\\\textbf{P}^{(2)}$ (using #formula-chapman-kolmogorov-matrix with $n=2, m=2$).\n$\\\\textbf{P}^{(4)} = \\\\begin{pmatrix} 0.83 & 0.17 \\\\\\\\ 0.34 & 0.66 \\\\end{pmatrix} \\\\begin{pmatrix} 0.83 & 0.17 \\\\\\\\ 0.34 & 0.66 \\\\end{pmatrix} = \\\\begin{pmatrix} (0.83)(0.83)+(0.17)(0.34) & (0.83)(0.17)+(0.17)(0.66) \\\\\\\\ (0.34)(0.83)+(0.66)(0.34) & (0.34)(0.17)+(0.66)(0.66) \\\\end{pmatrix}$\n\nCalculating the (A,B) element (1st row, 2nd column):\n$(0.83)(0.17) + (0.17)(0.66) = 0.1411 + 0.1122 = 0.2533$\n\nSo, $p_{AB}^{(4)} = 0.2533$. The probability of being at B after 4 steps, starting from A, is approximately 0.2533.",
+      "difficulty": "hard",
+      "testsConcepts": ["#formula-matrix-power", "#formula-chapman-kolmogorov-matrix", "#def-n-step-prob"]
+    }
+  ],
+  "tips": [
+    {
+      "id": "#tip-visualize-paths",
+      "text": "When you're trying to understand $p_{ij}^{(n)}$ conceptually, especially for small $n$ (like in Q3), draw out the possible paths! A state diagram (nodes for states, arrows for transitions with probabilities) can be incredibly helpful. It reinforces the #concept-markov-property and how intermediate states contribute to the overall probability, as seen in #formula-chapman-kolmogorov-scalar. Visualize the 'journey'!",
+      "relatesTo": ["#concept-n-step-transition-probability", "#formula-chapman-kolmogorov-scalar"],
+      "commonMistake": "Forgetting to sum over all intermediate paths."
+    },
+    {
+      "id": "#tip-matrix-multiplication-mastery",
+      "text": "The core of applying Chapman-Kolmogorov (especially in #formula-matrix-power and #formula-chapman-kolmogorov-matrix) is accurate matrix multiplication. If you're rusty, practice! A common mistake is getting the row/column elements mixed up. Remember: (row $i$ of first matrix) \\\\times (column $j$ of second matrix) gives element $(i,j)$ of the product. This directly addresses the 'Incorrect Matrix Multiplication' #example-weather-model-common-mistakes.",
+      "relatesTo": ["#formula-matrix-power", "#formula-chapman-kolmogorov-matrix"],
+      "commonMistake": "Errors in matrix multiplication."
+    },
+    {
+      "id": "#tip-indices-matter",
+      "text": "Always pay close attention to the indices $i$ and $j$ in $p_{ij}^{(n)}$. Remember, $i$ is the *starting* state (row) and $j$ is the *ending* state (column). This is critical when extracting values from your computed $\\\\textbf{P}^{(n)}$ matrix, as highlighted by the 'Misinterpreting $p_{ij}^{(n)}$' #example-weather-model-common-mistakes. If a question asks for $p_{CS}^{(2)}$, you need the element from the 'C' row and 'S' column.",
+      "relatesTo": ["#def-n-step-prob", "#formula-matrix-power"],
+      "commonMistake": "Swapping starting and ending states."
+    },
+    {
+      "id": "#tip-chapman-kolmogorov-flexibility",
+      "text": "Remember that #formula-chapman-kolmogorov-matrix ($\\\\textbf{P}^{(n+m)} = \\\\textbf{P}^{(n)} \\\\textbf{P}^{(m)}$) offers flexibility. You don't always have to calculate $\\\\textbf{P}^n$ from scratch. If you need $\\\\textbf{P}^{(10)}$, and you've already found $\\\\textbf{P}^{(5)}$, you can simply do $\\\\textbf{P}^{(10)} = \\\\textbf{P}^{(5)} \\\\textbf{P}^{(5)}$. This can save significant computation time for large $n$. This insight is key for problems like Q7 where you might need higher powers.",
+      "relatesTo": ["#formula-chapman-kolmogorov-matrix", "#formula-matrix-power"],
+      "commonMistake": "Always starting from $\\\\textbf{P}$ for every calculation, even if intermediate powers are available."
+    },
+    {
+      "id": "#tip-check-row-sums",
+      "text": "After you've calculated any $\\\\textbf{P}^{(n)}$ (like in Q5 or Q6), a quick sanity check is to sum the elements of each row. For any valid transition matrix, the probabilities in each row must sum to 1. If they don't, you've made a calculation error! This is a great way to catch 'Mathematical Errors' early, as mentioned in #example-weather-model-common-mistakes.",
+      "relatesTo": ["#concept-transition-matrix", "#def-transition-matrix"],
+      "commonMistake": "Arithmetic errors in matrix calculations."
+    }
+  ]
+}
+```

@@ -2306,3 +2306,187 @@ button:disabled .btn-text {
 .resizer.resizing {
     background: var(--accent-color);
 }
+/* Revision Mode Enhancements */
+
+/* Core Intuition */
+.intuition-section .intuition-content {
+    background: linear-gradient(to right, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.05));
+    border-left: 4px solid #3b82f6;
+    padding: 24px;
+    border-radius: 8px;
+    font-size: 1.1em;
+    color: var(--text-primary);
+    line-height: 1.8;
+}
+
+/* Important Concepts */
+.concepts-list {
+    display: grid;
+    gap: 16px;
+}
+
+.concept-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.2s;
+}
+
+.concept-item:hover {
+    border-color: var(--accent-color);
+    transform: translateY(-2px);
+}
+
+.concept-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.concept-name {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.concept-tag-badge, .card-tag-badge, .definition-tag-badge, .tip-tag-badge {
+    font-size: 0.75em;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 8px;
+    border-radius: 12px;
+    color: var(--text-muted);
+    font-family: monospace;
+}
+
+.concept-explanation {
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+/* Practice Zone */
+.practice-section {
+    margin-top: 64px;
+    padding-top: 32px;
+    border-top: 1px dashed var(--border-color);
+}
+
+.practice-controls {
+    margin-top: 24px;
+    display: flex;
+    justify-content: center;
+}
+
+.practice-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.practice-question {
+    font-size: 1.1em;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    line-height: 1.6;
+}
+
+.practice-hints {
+    margin-bottom: 20px;
+}
+
+.hints-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    color: var(--accent-color);
+    font-size: 0.9em;
+    font-weight: 500;
+    user-select: none;
+}
+
+.hints-toggle .arrow {
+    font-size: 0.8em;
+    transition: transform 0.2s;
+}
+
+.hints-toggle.visible .arrow {
+    transform: rotate(180deg);
+}
+
+.hints-content {
+    display: none;
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.hints-content.visible {
+    display: flex;
+}
+
+.hint-tag {
+    background: rgba(249, 115, 22, 0.1);
+    color: var(--accent-color);
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 0.85em;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.hint-tag:hover {
+    background: rgba(249, 115, 22, 0.2);
+    border-color: var(--accent-color);
+}
+
+.practice-answer-section {
+    border-top: 1px solid var(--border-color);
+    padding-top: 16px;
+}
+
+.answer-content {
+    display: none;
+    margin-top: 16px;
+    padding: 16px;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 8px;
+    color: var(--text-primary);
+}
+
+.answer-content.visible {
+    display: block;
+}
+
+/* Highlight Effect */
+.highlighted {
+    animation: highlightPulse 2s ease-out;
+}
+
+@keyframes highlightPulse {
+    0% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.7); border-color: var(--accent-color); }
+    70% { box-shadow: 0 0 0 10px rgba(249, 115, 22, 0); border-color: var(--accent-color); }
+    100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); }
+}
+
+/* Card Header Updates */
+.card-header, .definition-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
