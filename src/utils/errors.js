@@ -6,6 +6,14 @@ class ValidationError extends Error {
   }
 }
 
+class NotFoundError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'NotFoundError';
+    this.status = 404;
+  }
+}
+
 class AIGenerationError extends Error {
   constructor(message) {
     super(message);
@@ -16,5 +24,6 @@ class AIGenerationError extends Error {
 
 module.exports = {
   ValidationError,
+  NotFoundError,
   AIGenerationError
 };
