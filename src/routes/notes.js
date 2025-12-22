@@ -40,4 +40,11 @@ router.delete("/:noteId", authenticate, notesController.deleteNote);
 // Quick save from learning content (highlight and save)
 router.post("/quick-save", authenticate, notesController.quickSave);
 
+// Block-based content for subtopics (used by BlockEditor)
+// Save blocks for a subtopic
+router.put("/:subtopicId/blocks", authenticate, notesController.saveSubtopicBlocks);
+
+// Get blocks for a subtopic
+router.get("/:subtopicId/blocks", authenticate, notesController.getSubtopicBlocks);
+
 module.exports = router;

@@ -391,3 +391,184 @@ function getRequestTypeGuidelines(requestType) {
 
   return guidelines[requestType] || guidelines.missing_concept;
 }
+
+/**
+ * Handle AI actions on individual blocks (explain, simplify, expand, examples, regenerate)
+ */
+exports.handleBlockAction = async ({ action, content, blockType, context }) => {
+  try {
+    const actionPrompts = {
+      explain: `
+        Explain the following content in detail. Break down complex concepts,
+        provide intuition, and help the student understand WHY this works.
+        Add real-world examples where possible.
+      `,
+      simplify: `
+        Simplify the following content. Use simpler language, break down complex
+        ideas into smaller parts, and use analogies to everyday experiences.
+        Remove jargon and make it accessible to beginners.
+      `,
+      expand: `
+        Expand on the following content. Add more details, cover edge cases,
+        discuss related concepts, and provide a deeper understanding.
+        Include mathematical rigor where appropriate.
+      `,
+      examples: `
+        Add practical examples to illustrate the following content.
+        Provide 2-3 examples of varying complexity, showing the step-by-step
+        problem-solving process. Include real-world applications.
+      `,
+      regenerate: `
+        Regenerate and improve the following content. Make it clearer,
+        better structured, and more engaging. Fix any errors or unclear parts.
+        Maintain the same level of detail but improve the presentation.
+      `,
+    };
+
+    const actionPrompt = actionPrompts[action] || actionPrompts.explain;
+
+    const prompt = `
+You are an expert educational content creator.
+
+**Context**: ${context || "Educational learning content"}
+
+**Action Required**: ${action.toUpperCase()}
+${actionPrompt}
+
+**Original Content**:
+${content}
+
+**Content Type**: ${blockType || "text"}
+
+**Requirements**:
+1. Keep the response focused and educational
+2. Use Markdown formatting
+3. Use $ for inline LaTeX math (with \\\\ for LaTeX commands)
+4. Use $$ for display math equations
+5. Make the content clear and well-structured
+6. Be concise but comprehensive
+
+Respond with ONLY the improved/generated content, no additional explanation or preamble.
+`;
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      generationConfig: {
+        temperature: action === "regenerate" ? 0.8 : 0.7,
+        topP: 0.95,
+      },
+    });
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
+  } catch (error) {
+    console.error("Error in handleBlockAction:", error);
+    throw new AIGenerationError(`Failed to process AI action: ${error.message}`);
+  }
+};
+
+/**
+ * Generate content from user prompt
+ */
+exports.generateFromPrompt = async ({ prompt, style, context }) => {
+  try {
+    const teachingStyle = TEACHING_STYLES[style] || TEACHING_STYLES.first_principles;
+
+    const fullPrompt = `
+You are an expert educational content creator.
+
+**Context**: ${context || "Educational content"}
+
+**User Request**: ${prompt}
+
+**Teaching Style to Use**:
+${teachingStyle}
+
+**Requirements**:
+1. Create clear, educational content that addresses the request
+2. Use Markdown formatting
+3. Use $ for inline LaTeX math (with \\\\ for LaTeX commands)
+4. Use $$ for display math equations
+5. Include examples where appropriate
+6. Structure the content logically
+7. Be comprehensive but concise
+
+Generate the educational content:
+`;
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      generationConfig: {
+        temperature: 0.7,
+        topP: 0.95,
+      },
+    });
+
+    const result = await model.generateContent(fullPrompt);
+    const response = await result.response;
+    return response.text();
+  } catch (error) {
+    console.error("Error in generateFromPrompt:", error);
+    throw new AIGenerationError(`Failed to generate content: ${error.message}`);
+  }
+};
+
+/**
+ * Explain an image using AI vision
+ */
+exports.explainImage = async ({ imageData, context }) => {
+  try {
+    // Extract base64 data if it includes the data URL prefix
+    let base64Data = imageData;
+    let mimeType = "image/png";
+
+    if (imageData.startsWith("data:")) {
+      const matches = imageData.match(/^data:([^;]+);base64,(.+)$/);
+      if (matches) {
+        mimeType = matches[1];
+        base64Data = matches[2];
+      }
+    }
+
+    const prompt = `
+You are an expert educational assistant analyzing an image for a student.
+
+**Context**: ${context || "The student is learning and has uploaded an image for explanation."}
+
+**Task**: Analyze this image and provide a comprehensive educational explanation.
+
+**Requirements**:
+1. Describe what the image shows
+2. Explain any concepts, diagrams, graphs, or formulas visible
+3. If it's a mathematical graph or chart, explain the relationships shown
+4. If it contains formulas, explain what they mean and how they work
+5. Provide context on why this is important for learning
+6. Use Markdown formatting
+7. Use $ for inline LaTeX math when referencing equations
+
+Provide a clear, educational explanation of this image:
+`;
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      generationConfig: {
+        temperature: 0.5,
+      },
+    });
+
+    const imagePart = {
+      inlineData: {
+        data: base64Data,
+        mimeType: mimeType,
+      },
+    };
+
+    const result = await model.generateContent([prompt, imagePart]);
+    const response = await result.response;
+    return response.text();
+  } catch (error) {
+    console.error("Error in explainImage:", error);
+    throw new AIGenerationError(`Failed to explain image: ${error.message}`);
+  }
+};

@@ -49,17 +49,23 @@ import { ChatManager } from "./chatManager.js";
 import { ContentFeedback } from "./contentFeedback.js";
 import { NoteEditor } from "./noteEditor.js";
 import { KnowledgePopup } from "./knowledgePopup.js";
+// Block-based editor
+import { BlockEditor } from "./blockEditor.js";
 
 let chatManager;
 let contentFeedback;
 let noteEditor;
+let blockEditor;
 
 document.addEventListener("DOMContentLoaded", () => {
   chatManager = new ChatManager();
   contentFeedback = new ContentFeedback();
 
-  // Initialize note editor
+  // Initialize note editor (for sidebar - may be removed later)
   noteEditor = new NoteEditor("notes-container");
+
+  // Initialize block editor for main content area
+  blockEditor = new BlockEditor("content-container");
 
   // Setup sidebar tab switching
   setupSidebarTabs();
@@ -555,11 +561,19 @@ function displayExistingContent(content, subtopicName) {
   const contentContainer = document.getElementById("content-container");
   if (!contentContainer) return;
 
-  // Since displayGeneratedContent uses 'generated-content-container',
-  // let's provide that element.
-  contentContainer.innerHTML =
-    '<div class="content-sections"><div id="generated-content-container"></div></div>';
-  displayGeneratedContent(content, subtopicName);
+  // Get the active subtopic ID
+  const activeSubtopic = document.querySelector(".subtopic-item.active");
+  const subtopicId = activeSubtopic ? activeSubtopic.dataset.id : null;
+
+  // Use BlockEditor to display content
+  if (blockEditor && subtopicId) {
+    blockEditor.init(subtopicId, content);
+  } else {
+    // Fallback to old rendering if BlockEditor not available
+    contentContainer.innerHTML =
+      '<div class="content-sections"><div id="generated-content-container"></div></div>';
+    displayGeneratedContentLegacy(content, subtopicName);
+  }
 }
 
 // Start learning content generation
@@ -678,6 +692,32 @@ function displayGeneratedContent(content, subtopicName) {
     progressIndicator.style.display = "none";
   }
 
+  // Get the active subtopic ID
+  const activeSubtopic = document.querySelector(".subtopic-item.active");
+  const subtopicId = activeSubtopic ? activeSubtopic.dataset.id : null;
+
+  // Use BlockEditor to display content
+  if (blockEditor && subtopicId) {
+    blockEditor.init(subtopicId, content);
+
+    // Process knowledge tags after render
+    setTimeout(() => {
+      const container = document.getElementById("content-container");
+      if (container && window.KnowledgePopup && window.KnowledgePopup.processTagsInContent) {
+        window.KnowledgePopup.processTagsInContent(container);
+      }
+    }, 100);
+  } else {
+    // Fallback to legacy rendering
+    displayGeneratedContentLegacy(content, subtopicName);
+  }
+
+  const mainContent = document.querySelector("main.main-content");
+  if (mainContent) mainContent.scrollTop = 0;
+}
+
+// Legacy content rendering (fallback)
+function displayGeneratedContentLegacy(content, subtopicName) {
   const container = document.getElementById("generated-content-container");
   if (!container) return;
 
@@ -753,9 +793,6 @@ function displayGeneratedContent(content, subtopicName) {
   if (activeSubtopic && window.contentFeedback) {
     window.contentFeedback.init(activeSubtopic.dataset.id);
   }
-
-  const mainContent = document.querySelector("main.main-content");
-  mainContent.scrollTop = 0;
 }
 
 function formatLearningContent(text) {

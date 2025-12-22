@@ -22,4 +22,13 @@ router.post("/:requestId/integrate", authenticate, contentRequestController.inte
 // Quick "Explain Differently" endpoint
 router.post("/explain-differently", authenticate, contentRequestController.explainDifferently);
 
+// Block editor AI actions (explain, simplify, expand, examples, regenerate)
+router.post("/ai-action", authenticate, contentRequestController.aiAction);
+
+// Generate content from user prompt
+router.post("/generate", authenticate, contentRequestController.generateContent);
+
+// Explain an uploaded image
+router.post("/explain-image", authenticate, contentRequestController.explainImage);
+
 module.exports = router;
