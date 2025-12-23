@@ -263,9 +263,19 @@ const buildMasterPrompt = (context) => {
 
  **Mathematical formatting**:
  - Inline math: $...$
- - Display equations: $$...$$
+ - Display equations: $$...$$ (on their own lines)
  - Number important equations: (1), (2), etc.
  - Define variables immediately after introducing them
+
+ **Content structure for cards/blocks** (IMPORTANT):
+ - Each major formula should be introduced with context: "The formula for X is:" followed by $$formula$$
+ - Immediately after a formula, explain variables: "where X is..., Y represents..."
+ - Keep explanatory text with its formula - don't separate them with blank lines
+ - Each worked example should be ONE complete unit (problem → steps → answer)
+ - Use callout markers (🔑, 💡, ⚠️, 🔬, ✨) to denote complete, self-contained sections
+ - Questions should always be complete with all parts in one section
+ - Use double blank lines (two newlines) only between major sections
+ - Single blank lines within related content to keep it together
 
  **Depth calibration**:
  - Assume students have completed prerequisites
