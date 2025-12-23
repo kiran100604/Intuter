@@ -701,6 +701,21 @@ body {
     font-weight: 600;
 }
 
+/* Sidebar Header Title */
+.sidebar-header-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.sidebar-header-title svg {
+    color: var(--accent-color);
+}
+
 /* Sidebar Tabs */
 .sidebar-tabs {
     display: flex;

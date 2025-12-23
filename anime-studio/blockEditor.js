@@ -1040,11 +1040,13 @@ export class BlockEditor {
       if (action === "explain" || action === "expand" || action === "examples") {
         // Add new AI block after current block with label
         const blockIndex = this.blocks.findIndex((b) => b.id === blockId);
-        this.addBlock("ai_content", generatedContent, {
+        const newBlock = this.createBlock("ai_content", generatedContent, {
           isAiGenerated: true,
           aiActionLabel: actionLabels[action],
           sourceBlockId: blockId
-        }, blockIndex + 1);
+        });
+        this.blocks.splice(blockIndex + 1, 0, newBlock);
+        this.render();
       } else if (action === "simplify" || action === "regenerate") {
         // Replace current block content
         block.content = generatedContent;
@@ -1053,7 +1055,8 @@ export class BlockEditor {
         this.render();
       }
 
-      this.triggerAutoSave();
+      // Save immediately for AI-generated content (no debounce)
+      await this.saveBlocks();
     } catch (error) {
       console.error("AI action error:", error);
       this.showNotification("AI action failed. Please try again.", "error");

@@ -485,7 +485,7 @@ Output ONLY the ${action === "explain" || action === "expand" || action === "exa
       generationConfig: {
         temperature: action === "regenerate" ? 0.6 : 0.5,
         topP: 0.9,
-        maxOutputTokens: action === "explain" ? 300 : action === "examples" ? 500 : 400,
+        maxOutputTokens: 1024, // Enough for complete responses without being excessive
       },
     });
 
