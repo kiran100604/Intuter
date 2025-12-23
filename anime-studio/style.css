@@ -2572,93 +2572,74 @@ button:disabled .btn-text {
     margin-bottom: 8px;
 }
 
-/* ===== BLOCK EDITOR STYLES - Modern Aesthetic ===== */
+/* ===== BLOCK EDITOR STYLES - Enhanced UX ===== */
 
 .block-editor {
     max-width: 100%;
     margin: 0 auto;
+    padding: 0 16px;
 }
 
-.block-editor-toolbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 16px;
-    margin-bottom: 32px;
-    background: rgba(24, 24, 27, 0.6);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 16px;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-
-.add-block-btn {
+/* Inline Add Block Divider - Appears between blocks on hover */
+.add-block-divider {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 18px;
-    background: linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(249, 115, 22, 0.08) 100%);
-    border: 1px solid rgba(249, 115, 22, 0.25);
-    border-radius: 10px;
-    color: var(--accent-color);
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    gap: 12px;
+    padding: 8px 0;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    margin: 4px 28px;
 }
 
-.add-block-btn:hover {
-    background: linear-gradient(135deg, rgba(249, 115, 22, 0.25) 0%, rgba(249, 115, 22, 0.15) 100%);
-    border-color: var(--accent-color);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 20px rgba(249, 115, 22, 0.2);
+.add-block-divider:hover,
+.block-wrapper:hover + .add-block-divider,
+.add-block-divider:first-child:hover {
+    opacity: 1;
 }
 
-.add-block-btn span {
-    font-size: 16px;
-    font-weight: 600;
+.add-block-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.15) 50%, transparent 100%);
 }
 
-.toolbar-actions {
-    display: flex;
-    gap: 10px;
-}
-
-.toolbar-btn {
+.add-block-trigger {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 10px 16px;
+    padding: 6px 12px;
     background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 10px;
-    color: var(--text-secondary);
-    font-size: 13px;
-    font-weight: 500;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 12px;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s ease;
+    white-space: nowrap;
 }
 
-.toolbar-btn:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--text-primary);
-    transform: translateY(-1px);
+.add-block-trigger:hover {
+    background: rgba(249, 115, 22, 0.1);
+    border-color: rgba(249, 115, 22, 0.3);
+    color: var(--accent-color);
+    transform: scale(1.02);
 }
 
-.toolbar-btn.save-btn:hover {
-    background: rgba(16, 185, 129, 0.15);
-    border-color: rgba(16, 185, 129, 0.4);
-    color: #10b981;
-    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
+.add-block-trigger svg {
+    width: 14px;
+    height: 14px;
+}
+
+.add-block-label {
+    font-weight: 500;
 }
 
 /* Blocks Container */
 .blocks-container {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 0;
+    max-width: 100%;
 }
 
 /* Block Wrapper */
@@ -2667,11 +2648,33 @@ button:disabled .btn-text {
     display: flex;
     align-items: flex-start;
     gap: 8px;
+    width: 100%;
 }
 
 .block-wrapper.dragging {
     opacity: 0.4;
     transform: scale(0.98);
+}
+
+/* Editing State */
+.block-wrapper.editing .block {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.03) 100%);
+    border-color: rgba(59, 130, 246, 0.3);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1), 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.block.is-editing .block-content [contenteditable="true"],
+.editable-active {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: -8px -12px;
+    outline: none;
+    cursor: text;
+}
+
+.editable-active:focus {
+    background: rgba(255, 255, 255, 0.04);
 }
 
 .block-wrapper.processing::after {
@@ -2861,18 +2864,33 @@ h3.heading-content {
     transform: translateX(0);
 }
 
+/* Editing mode actions - always visible */
+.block-actions.editing-actions {
+    opacity: 1;
+    transform: translateX(0);
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
 .block-action-btn {
-    width: 30px;
-    height: 30px;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 4px;
     background: transparent;
     border: none;
     border-radius: 8px;
     color: var(--text-muted);
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 6px 8px;
+    min-width: 30px;
+    height: 30px;
+}
+
+.block-action-btn span {
+    font-size: 12px;
+    font-weight: 500;
 }
 
 .block-action-btn:hover {
@@ -2888,6 +2906,59 @@ h3.heading-content {
 .block-action-btn.delete-action:hover {
     background: rgba(239, 68, 68, 0.15);
     color: #ef4444;
+}
+
+/* Done and Cancel buttons for edit mode */
+.block-action-btn.done-action {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    padding: 6px 12px;
+}
+
+.block-action-btn.done-action:hover {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.block-action-btn.cancel-action {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    padding: 6px 12px;
+}
+
+.block-action-btn.cancel-action:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+/* AI Action Label on blocks */
+.ai-action-label {
+    position: absolute;
+    top: -10px;
+    left: 50px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(249, 115, 22, 0.08) 100%);
+    border: 1px solid rgba(249, 115, 22, 0.25);
+    border-radius: 6px;
+    font-size: 11px;
+    z-index: 5;
+}
+
+.ai-label-icon {
+    background: linear-gradient(135deg, var(--accent-color) 0%, #ea580c 100%);
+    color: white;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.ai-label-text {
+    color: var(--accent-color);
+    font-weight: 500;
 }
 
 /* Add Block Inline - Subtle, elegant */
@@ -3051,33 +3122,50 @@ h3.heading-content {
     box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
 }
 
-/* AI Actions Menu - Premium glass design */
+/* AI Actions Menu - Premium glass design with descriptions */
 .ai-actions-menu {
     background: rgba(24, 24, 27, 0.95);
     backdrop-filter: blur(20px);
     border: 1px solid rgba(249, 115, 22, 0.15);
     border-radius: 14px;
     box-shadow: 0 16px 64px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(249, 115, 22, 0.05) inset;
-    min-width: 200px;
+    min-width: 280px;
     overflow: hidden;
     z-index: 1000;
     animation: menuSlideIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .ai-menu-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     padding: 14px 18px;
-    font-size: 11px;
+    font-size: 14px;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--accent-color);
+    color: var(--text-primary);
     border-bottom: 1px solid rgba(249, 115, 22, 0.15);
     background: linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(249, 115, 22, 0.05) 100%);
 }
 
+.ai-header-icon {
+    background: linear-gradient(135deg, var(--accent-color) 0%, #ea580c 100%);
+    color: white;
+    padding: 3px 7px;
+    border-radius: 5px;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.ai-menu-description {
+    padding: 8px 18px;
+    font-size: 11px;
+    color: var(--text-muted);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
 .ai-menu-item {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
     padding: 12px 18px;
     background: transparent;
@@ -3093,16 +3181,57 @@ h3.heading-content {
 .ai-menu-item:hover {
     background: rgba(249, 115, 22, 0.08);
     color: var(--text-primary);
-    transform: translateX(2px);
 }
 
-.ai-menu-item:hover svg {
+.ai-menu-item:hover .ai-menu-item-icon svg {
     color: var(--accent-color);
 }
 
-.ai-menu-item svg {
+.ai-menu-item-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.ai-menu-item-icon svg {
     flex-shrink: 0;
     transition: color 0.2s;
+}
+
+.ai-menu-item-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ai-menu-item-title {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.ai-menu-item-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    opacity: 0.8;
+}
+
+.ai-menu-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.06);
+    margin: 4px 0;
+}
+
+.ai-menu-item.ai-menu-item-secondary {
+    opacity: 0.7;
+}
+
+.ai-menu-item.ai-menu-item-secondary:hover {
+    opacity: 1;
 }
 
 /* Image Block - Modern, clean */
@@ -3381,6 +3510,48 @@ h3.heading-content {
     line-height: 1.7;
     resize: vertical;
     outline: none;
+    display: none;
+}
+
+.code-editor.active {
+    display: block;
+}
+
+.code-display.hidden {
+    display: none;
+}
+
+/* LaTeX Block Edit Mode */
+.latex-edit-zone {
+    display: none;
+}
+
+.latex-edit-zone.active {
+    display: block;
+}
+
+.latex-display.hidden {
+    display: none;
+}
+
+.latex-editor {
+    width: 100%;
+    min-height: 80px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    resize: vertical;
+    outline: none;
+}
+
+.latex-editor:focus {
+    border-color: rgba(236, 72, 153, 0.4);
+    background: rgba(236, 72, 153, 0.05);
 }
 
 /* Callout Block - Elegant with subtle gradients */

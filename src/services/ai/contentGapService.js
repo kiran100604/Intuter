@@ -394,68 +394,98 @@ function getRequestTypeGuidelines(requestType) {
 
 /**
  * Handle AI actions on individual blocks (explain, simplify, expand, examples, regenerate)
+ * Focused on being contextual, concise, and purpose-driven like a helpful friend teaching
  */
 exports.handleBlockAction = async ({ action, content, blockType, context }) => {
   try {
+    // Contextual, concise prompts that feel like a friend helping you understand
     const actionPrompts = {
       explain: `
-        Explain the following content in detail. Break down complex concepts,
-        provide intuition, and help the student understand WHY this works.
-        Add real-world examples where possible.
+You are a helpful friend explaining something to a student who is confused about a specific part of what they're reading.
+
+The student was reading some learning content and didn't understand this part. They asked you to explain it.
+
+IMPORTANT GUIDELINES:
+- Be brief and to the point (2-4 sentences max)
+- Explain ONLY what's in the content, don't teach the entire topic
+- Use simple, conversational language like you're chatting with a friend
+- Focus on the "why" and intuition, not formal definitions
+- If there's a formula or concept, explain what it means in plain words
+- Don't add examples unless absolutely necessary for understanding
       `,
       simplify: `
-        Simplify the following content. Use simpler language, break down complex
-        ideas into smaller parts, and use analogies to everyday experiences.
-        Remove jargon and make it accessible to beginners.
+You are simplifying content for someone who finds the current explanation too complex.
+
+IMPORTANT GUIDELINES:
+- Keep the same length or make it SHORTER
+- Use everyday words, avoid jargon
+- If there are technical terms, explain them inline
+- Don't add new information, just make existing content clearer
+- Use analogies to familiar concepts when helpful
+- Preserve the key message while making it accessible
       `,
       expand: `
-        Expand on the following content. Add more details, cover edge cases,
-        discuss related concepts, and provide a deeper understanding.
-        Include mathematical rigor where appropriate.
+You are adding a bit more depth to content that the student wants to understand better.
+
+IMPORTANT GUIDELINES:
+- Add only incremental depth, not a complete rewrite
+- Include 1-2 additional insights, edge cases, or nuances
+- Keep the addition focused and relevant to the original content
+- Don't repeat what's already written
+- Don't turn a paragraph into an essay - be concise
+- Think "what would help them understand this more deeply?"
       `,
       examples: `
-        Add practical examples to illustrate the following content.
-        Provide 2-3 examples of varying complexity, showing the step-by-step
-        problem-solving process. Include real-world applications.
+You are providing practical examples for content the student is learning.
+
+IMPORTANT GUIDELINES:
+- Provide 1-2 relevant, practical examples only
+- Keep examples concise and directly related to the content
+- Show the step-by-step process briefly
+- Use realistic scenarios the student might encounter
+- Don't explain the theory again, just show it in action
+- Each example should take 3-5 lines max
       `,
       regenerate: `
-        Regenerate and improve the following content. Make it clearer,
-        better structured, and more engaging. Fix any errors or unclear parts.
-        Maintain the same level of detail but improve the presentation.
+You are rewriting content to make it clearer and better structured.
+
+IMPORTANT GUIDELINES:
+- Keep the same length and level of detail
+- Improve clarity and flow
+- Fix any confusing phrasing
+- Maintain the educational value
+- Don't add new concepts or examples
+- Just make what's there easier to read
       `,
     };
 
     const actionPrompt = actionPrompts[action] || actionPrompts.explain;
 
+    // Build context-aware prompt
     const prompt = `
-You are an expert educational content creator.
-
-**Context**: ${context || "Educational learning content"}
-
-**Action Required**: ${action.toUpperCase()}
 ${actionPrompt}
 
-**Original Content**:
+${context ? `**Reading Context** (what the student was reading before this):
+${context}
+
+` : ""}**Content to ${action}**:
 ${content}
 
-**Content Type**: ${blockType || "text"}
-
 **Requirements**:
-1. Keep the response focused and educational
-2. Use Markdown formatting
-3. Use $ for inline LaTeX math (with \\\\ for LaTeX commands)
-4. Use $$ for display math equations
-5. Make the content clear and well-structured
-6. Be concise but comprehensive
+- Use Markdown for formatting
+- Use $ for inline math, $$ for display equations
+- Be concise and purposeful
+- No preamble or meta-commentary, just the result
 
-Respond with ONLY the improved/generated content, no additional explanation or preamble.
+Output ONLY the ${action === "explain" || action === "expand" || action === "examples" ? "new content to add" : "improved content"}:
 `;
 
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
       generationConfig: {
-        temperature: action === "regenerate" ? 0.8 : 0.7,
-        topP: 0.95,
+        temperature: action === "regenerate" ? 0.6 : 0.5,
+        topP: 0.9,
+        maxOutputTokens: action === "explain" ? 300 : action === "examples" ? 500 : 400,
       },
     });
 
