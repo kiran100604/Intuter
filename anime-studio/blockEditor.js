@@ -268,17 +268,9 @@ export class BlockEditor {
           </div>
         </div>
         <div class="blocks-container" id="blocks-container">
-          <div class="block-gap block-gap-first" data-after-index="0">
-            <div class="block-gap-line"></div>
-            <button class="block-gap-btn" title="Add block here">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-            </button>
-          </div>
           ${this.blocks.map((block, index) => this.renderBlock(block, index)).join("")}
         </div>
+        ${this.renderAddBlockButton(this.blocks.length)}
       </div>
     `;
 
@@ -350,9 +342,8 @@ export class BlockEditor {
           <div class="block-actions">
             <button class="block-action-btn ai-action" data-action="ai" title="AI Actions">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/>
+                <path d="M12 6v6l4 2"/>
               </svg>
             </button>
             <button class="block-action-btn edit-action" data-action="edit" title="Edit block">
@@ -369,15 +360,7 @@ export class BlockEditor {
             </button>
           </div>
         </div>
-      </div>
-      <div class="block-gap" data-after-index="${index + 1}">
-        <div class="block-gap-line"></div>
-        <button class="block-gap-btn" title="Add block here">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-        </button>
+        ${this.renderAddBlockButton(index + 1)}
       </div>
     `;
   }
@@ -556,18 +539,30 @@ export class BlockEditor {
     return `<hr class="block-divider" />`;
   }
 
+  renderAddBlockButton(afterIndex) {
+    return `
+      <div class="add-block-inline" data-after-index="${afterIndex}">
+        <button class="add-block-line-btn" title="Add block here">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+    `;
+  }
+
   /**
    * Attach event listeners
    */
   attachEventListeners() {
     if (!this.container) return;
 
-    // Add block buttons (toolbar and gap buttons)
-    this.container.querySelectorAll(".add-block-btn, .block-gap-btn").forEach((btn) => {
+    // Add block buttons
+    this.container.querySelectorAll(".add-block-btn, .add-block-line-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
-        e.stopPropagation();
         const afterIndex = parseInt(e.target.closest("[data-after-index]")?.dataset.afterIndex ?? this.blocks.length);
-        this.showBlockTypeMenu(btn, afterIndex);
+        this.showBlockTypeMenu(e.target, afterIndex);
       });
     });
 
@@ -1124,155 +1119,58 @@ export class BlockEditor {
   }
 
   /**
-   * Edit a block (toggle edit mode or focus editable content)
+   * Edit a block (toggle edit mode for special blocks)
    */
   editBlock(blockId) {
     const block = this.blocks.find((b) => b.id === blockId);
     if (!block) return;
 
-    const blockWrapper = this.container.querySelector(`[data-block-id="${blockId}"]`)?.closest(".block-wrapper");
-    const blockElement = blockWrapper?.querySelector(".block");
+    const blockElement = this.container.querySelector(`[data-block-id="${blockId}"]`)?.closest(".block");
     if (!blockElement) return;
 
-    switch (block.type) {
-      case "text":
-      case "heading": {
-        // Focus the contenteditable element
-        const editable = blockElement.querySelector("[contenteditable]");
-        if (editable) {
-          editable.focus();
-          // Place cursor at end
-          const range = document.createRange();
-          const sel = window.getSelection();
-          range.selectNodeContents(editable);
-          range.collapse(false);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }
-        break;
-      }
+    if (block.type === "latex") {
+      const display = blockElement.querySelector(".latex-display");
+      const editor = blockElement.querySelector(".latex-edit-zone");
+      const textarea = editor?.querySelector("textarea");
 
-      case "callout": {
-        // Focus the callout body
-        const body = blockElement.querySelector(".callout-body");
-        if (body) {
-          body.focus();
-        }
-        break;
-      }
+      if (display && editor) {
+        const isEditing = editor.style.display !== "none";
+        display.style.display = isEditing ? "block" : "none";
+        editor.style.display = isEditing ? "none" : "block";
 
-      case "ai_content": {
-        // Show edit modal for AI content
-        this.showEditModal(block);
-        break;
-      }
-
-      case "latex": {
-        const display = blockElement.querySelector(".latex-display");
-        const editor = blockElement.querySelector(".latex-edit-zone");
-        const textarea = editor?.querySelector("textarea");
-
-        if (display && editor) {
-          const isEditing = editor.style.display !== "none";
-          display.style.display = isEditing ? "block" : "none";
-          editor.style.display = isEditing ? "none" : "block";
-
-          if (!isEditing && textarea) {
-            textarea.focus();
-            textarea.addEventListener("blur", () => {
-              block.content = textarea.value;
-              display.innerHTML = `$$${textarea.value}$$`;
-              display.style.display = "block";
-              editor.style.display = "none";
-              this.renderMathInBlocks();
-              this.triggerAutoSave();
-            }, { once: true });
-          }
-        }
-        break;
-      }
-
-      case "code": {
-        const display = blockElement.querySelector(".code-display");
-        const editor = blockElement.querySelector(".code-editor");
-
-        if (display && editor) {
-          const isEditing = editor.style.display !== "none";
-          display.style.display = isEditing ? "block" : "none";
-          editor.style.display = isEditing ? "none" : "block";
-
-          if (!isEditing) {
-            editor.focus();
-            editor.addEventListener("blur", () => {
-              block.content = editor.value;
-              display.querySelector("code").textContent = editor.value;
-              display.style.display = "block";
-              editor.style.display = "none";
-              this.triggerAutoSave();
-            }, { once: true });
-          }
-        }
-        break;
-      }
-
-      case "image": {
-        // Allow editing caption or re-uploading
-        const caption = blockElement.querySelector(".image-caption");
-        if (caption) {
-          caption.contentEditable = "true";
-          caption.focus();
-          caption.addEventListener("blur", () => {
-            block.metadata.caption = caption.textContent;
-            caption.contentEditable = "false";
+        if (!isEditing && textarea) {
+          textarea.focus();
+          textarea.addEventListener("blur", () => {
+            block.content = textarea.value;
+            display.innerHTML = `$$${textarea.value}$$`;
+            display.style.display = "block";
+            editor.style.display = "none";
+            this.renderMathInBlocks();
             this.triggerAutoSave();
           }, { once: true });
         }
-        break;
       }
+    } else if (block.type === "code") {
+      const display = blockElement.querySelector(".code-display");
+      const editor = blockElement.querySelector(".code-editor");
 
-      default:
-        break;
+      if (display && editor) {
+        const isEditing = editor.style.display !== "none";
+        display.style.display = isEditing ? "block" : "none";
+        editor.style.display = isEditing ? "none" : "block";
+
+        if (!isEditing) {
+          editor.focus();
+          editor.addEventListener("blur", () => {
+            block.content = editor.value;
+            display.querySelector("code").textContent = editor.value;
+            display.style.display = "block";
+            editor.style.display = "none";
+            this.triggerAutoSave();
+          }, { once: true });
+        }
+      }
     }
-  }
-
-  /**
-   * Show edit modal for AI content blocks
-   */
-  showEditModal(block) {
-    const modal = document.createElement("div");
-    modal.className = "block-edit-modal modal";
-    modal.innerHTML = `
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>Edit Content</h3>
-          <button class="close-button">&times;</button>
-        </div>
-        <textarea class="edit-textarea">${block.content}</textarea>
-        <div class="dialog-actions">
-          <button class="btn-secondary cancel-btn">Cancel</button>
-          <button class="btn-primary save-edit-btn">Save</button>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(modal);
-
-    const textarea = modal.querySelector(".edit-textarea");
-    textarea.focus();
-
-    modal.querySelector(".close-button").addEventListener("click", () => modal.remove());
-    modal.querySelector(".cancel-btn").addEventListener("click", () => modal.remove());
-    modal.querySelector(".save-edit-btn").addEventListener("click", () => {
-      block.content = textarea.value;
-      block.metadata.updatedAt = new Date().toISOString();
-      this.render();
-      this.triggerAutoSave();
-      modal.remove();
-    });
-
-    modal.addEventListener("click", (e) => {
-      if (e.target === modal) modal.remove();
-    });
   }
 
   /**
