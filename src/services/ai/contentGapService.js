@@ -398,64 +398,58 @@ function getRequestTypeGuidelines(requestType) {
  */
 exports.handleBlockAction = async ({ action, content, blockType, context }) => {
   try {
-    // Contextual, concise prompts that feel like a friend helping you understand
+    // Contextual prompts that are concise but COMPLETE - never cut off mid-thought
     const actionPrompts = {
       explain: `
-You are a helpful friend explaining something to a student who is confused about a specific part of what they're reading.
+You are a helpful friend explaining something to a student who didn't understand a part of what they're reading.
 
-The student was reading some learning content and didn't understand this part. They asked you to explain it.
-
-IMPORTANT GUIDELINES:
-- Be brief and to the point (2-4 sentences max)
+GUIDELINES:
+- Give a clear, complete explanation (3-6 sentences is fine)
 - Explain ONLY what's in the content, don't teach the entire topic
-- Use simple, conversational language like you're chatting with a friend
+- Use simple, conversational language
 - Focus on the "why" and intuition, not formal definitions
-- If there's a formula or concept, explain what it means in plain words
-- Don't add examples unless absolutely necessary for understanding
+- ALWAYS complete your sentences and thoughts fully
       `,
       simplify: `
 You are simplifying content for someone who finds the current explanation too complex.
 
-IMPORTANT GUIDELINES:
-- Keep the same length or make it SHORTER
-- Use everyday words, avoid jargon
-- If there are technical terms, explain them inline
-- Don't add new information, just make existing content clearer
+GUIDELINES:
+- Rewrite the ENTIRE content in simpler words
+- Keep all the key information, just make it easier to understand
+- Use everyday language, avoid or explain jargon
 - Use analogies to familiar concepts when helpful
-- Preserve the key message while making it accessible
+- The output should be roughly the same length, just clearer
+- ALWAYS complete your sentences fully - never cut off mid-thought
       `,
       expand: `
-You are adding a bit more depth to content that the student wants to understand better.
+You are adding more depth to content that the student wants to understand better.
 
-IMPORTANT GUIDELINES:
-- Add only incremental depth, not a complete rewrite
-- Include 1-2 additional insights, edge cases, or nuances
-- Keep the addition focused and relevant to the original content
+GUIDELINES:
+- Add 2-3 additional insights, details, or nuances
+- Keep additions relevant to the original content
 - Don't repeat what's already written
-- Don't turn a paragraph into an essay - be concise
-- Think "what would help them understand this more deeply?"
+- Be thorough but focused
+- ALWAYS complete your thoughts fully
       `,
       examples: `
 You are providing practical examples for content the student is learning.
 
-IMPORTANT GUIDELINES:
-- Provide 1-2 relevant, practical examples only
-- Keep examples concise and directly related to the content
-- Show the step-by-step process briefly
-- Use realistic scenarios the student might encounter
-- Don't explain the theory again, just show it in action
-- Each example should take 3-5 lines max
+GUIDELINES:
+- Provide 2-3 relevant, practical examples
+- Keep examples clear and directly related to the content
+- Show step-by-step when applicable
+- Use realistic scenarios
+- ALWAYS complete each example fully
       `,
       regenerate: `
 You are rewriting content to make it clearer and better structured.
 
-IMPORTANT GUIDELINES:
+GUIDELINES:
 - Keep the same length and level of detail
-- Improve clarity and flow
+- Improve clarity, flow, and structure
 - Fix any confusing phrasing
-- Maintain the educational value
-- Don't add new concepts or examples
-- Just make what's there easier to read
+- Maintain all educational value
+- ALWAYS output complete, well-formed content
       `,
     };
 
@@ -471,10 +465,10 @@ ${context}
 ` : ""}**Content to ${action}**:
 ${content}
 
-**Requirements**:
+**Critical Requirements**:
+- MUST output complete sentences - never truncate or cut off mid-thought
 - Use Markdown for formatting
 - Use $ for inline math, $$ for display equations
-- Be concise and purposeful
 - No preamble or meta-commentary, just the result
 
 Output ONLY the ${action === "explain" || action === "expand" || action === "examples" ? "new content to add" : "improved content"}:
@@ -485,7 +479,7 @@ Output ONLY the ${action === "explain" || action === "expand" || action === "exa
       generationConfig: {
         temperature: action === "regenerate" ? 0.6 : 0.5,
         topP: 0.9,
-        maxOutputTokens: 1024, // Enough for complete responses without being excessive
+        maxOutputTokens: 2048, // Generous limit to ensure complete responses
       },
     });
 
