@@ -76,7 +76,9 @@ Generate content that addresses the student's specific request. The content shou
 2. Use the specified teaching style
 3. Include relevant tags (#concept-xxx, #formula-xxx) for cross-referencing
 4. Be comprehensive yet concise
-5. Include examples where appropriate
+5. Include examples where appropriate - each example should be complete (problem → solution → answer)
+6. Keep formulas with their context: introduce with ":" then $$formula$$, then "where..." explanation
+7. Each concept/section should be self-contained and complete
 
 **Output Format**:
 Return valid JSON with this structure:
@@ -170,9 +172,11 @@ Re-explain the same concepts using the new teaching style. Do NOT just rephrase 
 **Requirements**:
 1. Cover the same core concepts but from a fresh angle
 2. Use the specified teaching style structure
-3. Include new examples or analogies
+3. Include new examples or analogies - each complete (problem → solution → answer)
 4. Maintain mathematical accuracy
 5. Use Markdown formatting with $ for inline LaTeX (use \\\\ for LaTeX commands)
+6. Keep formulas with their context: introduce with ":" then $$formula$$, then "where..." explanation
+7. Each section should be self-contained and complete
 
 **Output Format**:
 Return valid JSON:
@@ -409,6 +413,7 @@ GUIDELINES:
 - Use simple, conversational language
 - Focus on the "why" and intuition, not formal definitions
 - ALWAYS complete your sentences and thoughts fully
+- If explaining a formula, keep the explanation WITH the formula (don't separate them)
       `,
       simplify: `
 You are simplifying content for someone who finds the current explanation too complex.
@@ -420,6 +425,7 @@ GUIDELINES:
 - Use analogies to familiar concepts when helpful
 - The output should be roughly the same length, just clearer
 - ALWAYS complete your sentences fully - never cut off mid-thought
+- If there are formulas, keep explanations directly before/after them
       `,
       expand: `
 You are adding more depth to content that the student wants to understand better.
@@ -430,6 +436,7 @@ GUIDELINES:
 - Don't repeat what's already written
 - Be thorough but focused
 - ALWAYS complete your thoughts fully
+- Keep any formulas together with their explanations
       `,
       examples: `
 You are providing practical examples for content the student is learning.
@@ -439,7 +446,8 @@ GUIDELINES:
 - Keep examples clear and directly related to the content
 - Show step-by-step when applicable
 - Use realistic scenarios
-- ALWAYS complete each example fully
+- ALWAYS complete each example fully - never leave a problem without its solution
+- Each example should be self-contained: Problem → Solution → Answer
       `,
       regenerate: `
 You are rewriting content to make it clearer and better structured.
@@ -450,6 +458,7 @@ GUIDELINES:
 - Fix any confusing phrasing
 - Maintain all educational value
 - ALWAYS output complete, well-formed content
+- Keep formulas with their introducing text and explanations
       `,
     };
 
@@ -469,6 +478,8 @@ ${content}
 - MUST output complete sentences - never truncate or cut off mid-thought
 - Use Markdown for formatting
 - Use $ for inline math, $$ for display equations
+- Keep formulas with their context (introduce with ":" then formula, then "where..." explanation)
+- Each concept/example should be a complete, self-contained unit
 - No preamble or meta-commentary, just the result
 
 Output ONLY the ${action === "explain" || action === "expand" || action === "examples" ? "new content to add" : "improved content"}:
@@ -513,10 +524,12 @@ ${teachingStyle}
 1. Create clear, educational content that addresses the request
 2. Use Markdown formatting
 3. Use $ for inline LaTeX math (with \\\\ for LaTeX commands)
-4. Use $$ for display math equations
-5. Include examples where appropriate
+4. Use $$ for display math equations (on their own lines)
+5. Include examples where appropriate - each should be complete (problem → solution → answer)
 6. Structure the content logically
 7. Be comprehensive but concise
+8. Keep formulas with their context: introduce with ":" then $$formula$$, then "where..." explanation
+9. Each concept should be self-contained and complete
 
 Generate the educational content:
 `;

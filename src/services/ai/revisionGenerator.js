@@ -142,6 +142,13 @@ Your revision guide must tell a coherent story where each section naturally flow
 - Use analogies and metaphors
 - Celebrate understanding: "Great! Now you see..."
 
+**Content Structure for Cards/Blocks**:
+- Each formula should be introduced with context: "The formula for X is:" followed by the expression
+- Immediately after a formula, explain variables: "where X is..., Y represents..."
+- Keep explanatory text with its formula - they form a single unit
+- Each worked example step should be complete (action → calculation → explanation)
+- Questions should include all parts in one unit - never fragment a question
+
 **CRITICAL JSON ESCAPING RULES FOR LaTeX**:
 You must properly escape LaTeX in JSON strings. Follow these rules:
 

@@ -91,43 +91,105 @@ export class BlockEditor {
   }
 
   /**
-   * Parse markdown-like content into blocks
+   * Parse markdown-like content into blocks with semantic awareness
+   * Key principle: Keep related content together (formulas with explanations, examples complete, etc.)
    */
   parseContentIntoBlocks(content, isAiGenerated = false) {
     const blocks = [];
     const lines = content.split("\n");
     let currentText = [];
 
+    // Helper: Check if text ends with a formula introduction pattern
+    const endsWithFormulaIntro = (text) => {
+      const patterns = [
+        /:\s*$/,                    // ends with colon
+        /is\s*$/i,                  // "is"
+        /are\s*$/i,                 // "are"
+        /as\s*$/i,                  // "as"
+        /by\s*$/i,                  // "by"
+        /gives?\s*$/i,              // "give(s)"
+        /becomes?\s*$/i,            // "become(s)"
+        /equals?\s*$/i,             // "equal(s)"
+        /yields?\s*$/i,             // "yield(s)"
+        /following\s*$/i,           // "following"
+        /formula\s*$/i,             // "formula"
+        /equation\s*$/i,            // "equation"
+        /expression\s*$/i,          // "expression"
+        /defined as\s*$/i,          // "defined as"
+        /given by\s*$/i,            // "given by"
+        /written as\s*$/i,          // "written as"
+        /expressed as\s*$/i,        // "expressed as"
+        /calculated using\s*$/i,    // "calculated using"
+        /computed as\s*$/i,         // "computed as"
+      ];
+      return patterns.some(p => p.test(text.trim()));
+    };
+
+    // Helper: Check if text is a formula explanation/continuation
+    const isFormulaExplanation = (text) => {
+      const patterns = [
+        /^where\s/i,                // "where x is..."
+        /^here,?\s/i,               // "here, x represents..."
+        /^in which\s/i,             // "in which..."
+        /^with\s/i,                 // "with x being..."
+        /^and\s/i,                  // "and y is..."
+        /^note that\s/i,            // "note that..."
+        /^this\s/i,                 // "this means..."
+        /^the\s+\w+\s+(is|are|represents?)/i, // "the variable x represents..."
+      ];
+      return patterns.some(p => p.test(text.trim()));
+    };
+
+    // Helper: Flush current text as a block
+    const flushTextBlock = () => {
+      if (currentText.length > 0) {
+        const text = currentText.join("\n").trim();
+        if (text) {
+          blocks.push(this.createBlock("text", text, { isAiGenerated }));
+        }
+        currentText = [];
+      }
+    };
+
+    // Helper: Create a block that keeps formula with its context
+    const createFormulaWithContext = (latexContent, contextBefore = [], contextAfter = []) => {
+      // If there's context, create a combined text block with embedded LaTeX
+      if (contextBefore.length > 0 || contextAfter.length > 0) {
+        const combinedContent = [
+          ...contextBefore,
+          `$$${latexContent}$$`,
+          ...contextAfter
+        ].join("\n").trim();
+        return this.createBlock("text", combinedContent, {
+          isAiGenerated,
+          hasFormula: true
+        });
+      }
+      // Standalone formula
+      return this.createBlock("latex", latexContent, { isAiGenerated });
+    };
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const trimmed = line.trim();
 
-      // Heading detection
-      if (trimmed.startsWith("### ")) {
-        if (currentText.length > 0) {
-          blocks.push(this.createBlock("text", currentText.join("\n"), { isAiGenerated }));
-          currentText = [];
-        }
-        blocks.push(this.createBlock("heading", trimmed.replace("### ", ""), { level: 3, isAiGenerated }));
-        continue;
-      }
-
+      // Major section heading (##) - Always creates a break
       if (trimmed.startsWith("## ")) {
-        if (currentText.length > 0) {
-          blocks.push(this.createBlock("text", currentText.join("\n"), { isAiGenerated }));
-          currentText = [];
-        }
+        flushTextBlock();
         blocks.push(this.createBlock("heading", trimmed.replace("## ", ""), { level: 2, isAiGenerated }));
         continue;
       }
 
-      // Code block detection
-      if (trimmed.startsWith("```")) {
-        if (currentText.length > 0) {
-          blocks.push(this.createBlock("text", currentText.join("\n"), { isAiGenerated }));
-          currentText = [];
-        }
+      // Subsection heading (###) - Creates a break
+      if (trimmed.startsWith("### ")) {
+        flushTextBlock();
+        blocks.push(this.createBlock("heading", trimmed.replace("### ", ""), { level: 3, isAiGenerated }));
+        continue;
+      }
 
+      // Code block - Always separate
+      if (trimmed.startsWith("```")) {
+        flushTextBlock();
         const lang = trimmed.replace("```", "").trim() || "text";
         let codeContent = [];
         i++;
@@ -139,14 +201,10 @@ export class BlockEditor {
         continue;
       }
 
-      // LaTeX block detection
+      // LaTeX block detection - Keep with surrounding context
       if (trimmed.startsWith("$$")) {
-        if (currentText.length > 0) {
-          blocks.push(this.createBlock("text", currentText.join("\n"), { isAiGenerated }));
-          currentText = [];
-        }
-
-        let latexContent = [trimmed.replace("$$", "")];
+        // Collect LaTeX content
+        let latexContent = [trimmed.replace(/^\$\$/, "").replace(/\$\$$/, "")];
         if (!trimmed.endsWith("$$") || trimmed === "$$") {
           i++;
           while (i < lines.length && !lines[i].trim().endsWith("$$")) {
@@ -154,34 +212,82 @@ export class BlockEditor {
             i++;
           }
           if (i < lines.length) {
-            latexContent.push(lines[i].replace("$$", ""));
+            latexContent.push(lines[i].replace(/\$\$$/, ""));
           }
         }
-        blocks.push(this.createBlock("latex", latexContent.join("\n").trim(), { isAiGenerated }));
+        const latex = latexContent.join("\n").trim();
+
+        // Check if previous text introduces this formula
+        const currentTextJoined = currentText.join("\n");
+        const shouldKeepWithPrevious = endsWithFormulaIntro(currentTextJoined);
+
+        // Look ahead for formula explanation
+        let explanationLines = [];
+        let lookAhead = i + 1;
+        while (lookAhead < lines.length) {
+          const nextLine = lines[lookAhead].trim();
+          if (!nextLine) {
+            lookAhead++;
+            continue;
+          }
+          if (isFormulaExplanation(nextLine)) {
+            // Collect the explanation (usually one paragraph)
+            while (lookAhead < lines.length && lines[lookAhead].trim() &&
+                   !lines[lookAhead].trim().startsWith("#") &&
+                   !lines[lookAhead].trim().startsWith("$$") &&
+                   !lines[lookAhead].trim().startsWith("```")) {
+              explanationLines.push(lines[lookAhead]);
+              lookAhead++;
+            }
+            i = lookAhead - 1;
+            break;
+          }
+          break;
+        }
+
+        if (shouldKeepWithPrevious || explanationLines.length > 0) {
+          // Keep formula with its context
+          const contextBefore = shouldKeepWithPrevious ? currentText : [];
+          if (shouldKeepWithPrevious) currentText = [];
+
+          blocks.push(createFormulaWithContext(latex, contextBefore, explanationLines));
+        } else {
+          // Standalone formula
+          flushTextBlock();
+          blocks.push(this.createBlock("latex", latex, { isAiGenerated }));
+        }
         continue;
       }
 
-      // Callout detection
+      // Callout detection - Key definitions, examples, tips, etc.
       const calloutMatch = trimmed.match(/^(?:>?\s*)?([\u{1F300}-\u{1F9FF}]|[^\w\s])\s*\*\*([^:*]+)(?:\*\*)?:\*?\*?/u);
       if (calloutMatch) {
-        if (currentText.length > 0) {
-          blocks.push(this.createBlock("text", currentText.join("\n"), { isAiGenerated }));
-          currentText = [];
-        }
+        flushTextBlock();
 
         const title = calloutMatch[2].trim();
         let calloutType = "info";
-        if (title.toLowerCase().includes("definition")) calloutType = "definition";
+        if (title.toLowerCase().includes("definition") || title.toLowerCase().includes("key")) calloutType = "definition";
         else if (title.toLowerCase().includes("tip") || title.toLowerCase().includes("pro")) calloutType = "tip";
-        else if (title.toLowerCase().includes("warning") || title.toLowerCase().includes("pitfall")) calloutType = "warning";
+        else if (title.toLowerCase().includes("warning") || title.toLowerCase().includes("pitfall") || title.toLowerCase().includes("common")) calloutType = "warning";
         else if (title.toLowerCase().includes("example")) calloutType = "example";
+        else if (title.toLowerCase().includes("intuition")) calloutType = "tip";
 
-        // Collect callout content
+        // Collect entire callout content including any formulas
         let calloutContent = [trimmed.replace(calloutMatch[0], "").trim()];
         i++;
-        while (i < lines.length && lines[i].trim() && !lines[i].trim().startsWith("#")) {
-          if (lines[i].trim().match(/^(?:>?\s*)?([\u{1F300}-\u{1F9FF}]|[^\w\s])\s*\*\*[^:*]+/u)) {
+        while (i < lines.length) {
+          const nextLine = lines[i].trim();
+          // Stop at headings or new callouts
+          if (nextLine.startsWith("#")) {
             i--;
+            break;
+          }
+          if (nextLine.match(/^(?:>?\s*)?([\u{1F300}-\u{1F9FF}]|[^\w\s])\s*\*\*[^:*]+/u)) {
+            i--;
+            break;
+          }
+          // Stop at double blank lines (paragraph break)
+          if (!nextLine && i + 1 < lines.length && !lines[i + 1].trim()) {
             break;
           }
           calloutContent.push(lines[i].replace(/^>\s*/, ""));
@@ -198,25 +304,27 @@ export class BlockEditor {
 
       // Divider
       if (trimmed === "---" || trimmed === "***") {
-        if (currentText.length > 0) {
-          blocks.push(this.createBlock("text", currentText.join("\n"), { isAiGenerated }));
-          currentText = [];
-        }
+        flushTextBlock();
         blocks.push(this.createBlock("divider", "", { isAiGenerated }));
         continue;
       }
 
-      // Regular text
+      // Double blank line creates a paragraph break
+      if (!trimmed && currentText.length > 0) {
+        // Check if next line is also blank
+        if (i + 1 < lines.length && !lines[i + 1].trim()) {
+          flushTextBlock();
+          i++; // Skip the second blank line
+          continue;
+        }
+      }
+
+      // Regular text - accumulate
       currentText.push(line);
     }
 
-    // Add remaining text
-    if (currentText.length > 0) {
-      const text = currentText.join("\n").trim();
-      if (text) {
-        blocks.push(this.createBlock("text", text, { isAiGenerated }));
-      }
-    }
+    // Flush remaining text
+    flushTextBlock();
 
     return blocks;
   }
