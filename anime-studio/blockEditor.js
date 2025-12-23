@@ -1,6 +1,6 @@
 /**
  * BlockEditor - A Notion-like block-based content editor
- * Allows users to edit content in blocks, add images/videos, and interact with AI
+ * Enhanced UX with inline block insertion, clear edit states, and contextual AI
  */
 
 export class BlockEditor {
@@ -12,6 +12,7 @@ export class BlockEditor {
     this.sessionId = localStorage.getItem("sessionId");
     this.onContentChange = options.onContentChange || (() => {});
     this.autoSaveTimeout = null;
+    this.editingBlockId = null; // Track which block is in edit mode
 
     // Block types configuration
     this.blockTypes = {
@@ -39,18 +40,18 @@ export class BlockEditor {
       return;
     }
 
-    // If we have existing content (from AI generation), convert it to blocks
-    if (existingContent && Object.keys(existingContent).length > 0) {
+    // ALWAYS try to load saved blocks first (preserves user edits and AI modifications)
+    const savedBlocks = await this.loadBlocks();
+    if (savedBlocks && savedBlocks.length > 0) {
+      this.blocks = savedBlocks;
+    } else if (existingContent && Object.keys(existingContent).length > 0) {
+      // Only use existing content if no saved blocks (first time viewing)
       this.blocks = this.convertContentToBlocks(existingContent);
+      // Save immediately so future loads will use saved blocks
+      await this.saveBlocks();
     } else {
-      // Try to load saved blocks from backend
-      const savedBlocks = await this.loadBlocks();
-      if (savedBlocks && savedBlocks.length > 0) {
-        this.blocks = savedBlocks;
-      } else {
-        // Start with an empty text block
-        this.blocks = [this.createBlock("text", "")];
-      }
+      // Start with an empty text block
+      this.blocks = [this.createBlock("text", "")];
     }
 
     this.render();
@@ -252,25 +253,10 @@ export class BlockEditor {
 
     this.container.innerHTML = `
       <div class="block-editor">
-        <div class="block-editor-toolbar">
-          <button class="add-block-btn" title="Add block">
-            <span>+</span> Add Block
-          </button>
-          <div class="toolbar-actions">
-            <button class="toolbar-btn save-btn" title="Save changes">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                <polyline points="7 3 7 8 15 8"></polyline>
-              </svg>
-              Save
-            </button>
-          </div>
-        </div>
+        ${this.renderInlineAddBlock(0)}
         <div class="blocks-container" id="blocks-container">
           ${this.blocks.map((block, index) => this.renderBlock(block, index)).join("")}
         </div>
-        ${this.renderAddBlockButton(this.blocks.length)}
       </div>
     `;
 
@@ -279,23 +265,44 @@ export class BlockEditor {
   }
 
   /**
+   * Render inline add block divider (appears between blocks on hover)
+   */
+  renderInlineAddBlock(afterIndex) {
+    return `
+      <div class="add-block-divider" data-after-index="${afterIndex}">
+        <div class="add-block-line"></div>
+        <button class="add-block-trigger" title="Add block here">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span class="add-block-label">Add Block</span>
+        </button>
+        <div class="add-block-line"></div>
+      </div>
+    `;
+  }
+
+  /**
    * Render a single block
    */
   renderBlock(block, index) {
     const typeConfig = this.blockTypes[block.type] || this.blockTypes.text;
     const isAi = block.metadata.isAiGenerated;
+    const isEditing = this.editingBlockId === block.id;
+    const aiActionLabel = block.metadata.aiActionLabel;
 
     let contentHtml = "";
 
     switch (block.type) {
       case "text":
-        contentHtml = this.renderTextBlock(block);
+        contentHtml = this.renderTextBlock(block, isEditing);
         break;
       case "heading":
-        contentHtml = this.renderHeadingBlock(block);
+        contentHtml = this.renderHeadingBlock(block, isEditing);
         break;
       case "ai_content":
-        contentHtml = this.renderAiContentBlock(block);
+        contentHtml = this.renderAiContentBlock(block, isEditing);
         break;
       case "image":
         contentHtml = this.renderImageBlock(block);
@@ -304,23 +311,23 @@ export class BlockEditor {
         contentHtml = this.renderVideoBlock(block);
         break;
       case "latex":
-        contentHtml = this.renderLatexBlock(block);
+        contentHtml = this.renderLatexBlock(block, isEditing);
         break;
       case "code":
-        contentHtml = this.renderCodeBlock(block);
+        contentHtml = this.renderCodeBlock(block, isEditing);
         break;
       case "callout":
-        contentHtml = this.renderCalloutBlock(block);
+        contentHtml = this.renderCalloutBlock(block, isEditing);
         break;
       case "divider":
         contentHtml = this.renderDividerBlock(block);
         break;
       default:
-        contentHtml = this.renderTextBlock(block);
+        contentHtml = this.renderTextBlock(block, isEditing);
     }
 
     return `
-      <div class="block-wrapper" data-block-id="${block.id}" data-block-index="${index}">
+      <div class="block-wrapper ${isEditing ? 'editing' : ''}" data-block-id="${block.id}" data-block-index="${index}">
         <div class="block-handle" draggable="true" title="Drag to reorder">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
             <circle cx="9" cy="6" r="2"></circle>
@@ -331,70 +338,84 @@ export class BlockEditor {
             <circle cx="15" cy="18" r="2"></circle>
           </svg>
         </div>
-        <div class="block ${block.type}-block ${isAi ? "ai-generated" : ""}" data-type="${block.type}">
-          <div class="block-type-indicator" style="background: ${typeConfig.color}20; color: ${typeConfig.color}">
-            ${typeConfig.icon}
-            ${isAi ? '<span class="ai-badge">AI</span>' : ""}
-          </div>
+        <div class="block ${block.type}-block ${isAi ? "ai-generated" : ""} ${isEditing ? 'is-editing' : ''}" data-type="${block.type}">
+          ${aiActionLabel ? `
+            <div class="ai-action-label">
+              <span class="ai-label-icon">AI</span>
+              <span class="ai-label-text">${aiActionLabel}</span>
+            </div>
+          ` : ''}
           <div class="block-content">
             ${contentHtml}
           </div>
-          <div class="block-actions">
-            <button class="block-action-btn ai-action" data-action="ai" title="AI Actions">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/>
-                <path d="M12 6v6l4 2"/>
-              </svg>
-            </button>
-            <button class="block-action-btn edit-action" data-action="edit" title="Edit block">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-              </svg>
-            </button>
-            <button class="block-action-btn delete-action" data-action="delete" title="Delete block">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-            </button>
+          <div class="block-actions ${isEditing ? 'editing-actions' : ''}">
+            ${isEditing ? `
+              <button class="block-action-btn done-action" data-action="done" title="Done editing">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Done</span>
+              </button>
+              <button class="block-action-btn cancel-action" data-action="cancel" title="Cancel editing">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+                <span>Cancel</span>
+              </button>
+            ` : `
+              <button class="block-action-btn ai-action" data-action="ai" title="AI Actions">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+                </svg>
+              </button>
+              <button class="block-action-btn edit-action" data-action="edit" title="Edit block">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
+              <button class="block-action-btn delete-action" data-action="delete" title="Delete block">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+            `}
           </div>
         </div>
-        ${this.renderAddBlockButton(index + 1)}
       </div>
+      ${this.renderInlineAddBlock(index + 1)}
     `;
   }
 
-  renderTextBlock(block) {
+  renderTextBlock(block, isEditing) {
     return `
-      <div class="text-content" contenteditable="true" data-placeholder="Type something..."
+      <div class="text-content ${isEditing ? 'editable-active' : ''}"
+           contenteditable="${isEditing ? 'true' : 'false'}"
+           data-placeholder="Type something..."
            data-block-id="${block.id}">${this.formatMarkdown(block.content)}</div>
     `;
   }
 
-  renderHeadingBlock(block) {
+  renderHeadingBlock(block, isEditing) {
     const level = block.metadata.level || 2;
     return `
-      <h${level} class="heading-content" contenteditable="true"
-          data-placeholder="Heading..." data-block-id="${block.id}">${block.content}</h${level}>
+      <h${level} class="heading-content ${isEditing ? 'editable-active' : ''}"
+          contenteditable="${isEditing ? 'true' : 'false'}"
+          data-placeholder="Heading..."
+          data-block-id="${block.id}">${block.content}</h${level}>
     `;
   }
 
-  renderAiContentBlock(block) {
+  renderAiContentBlock(block, isEditing) {
+    const actionLabel = block.metadata.aiActionLabel || "Generated";
     return `
       <div class="ai-content-wrapper">
-        <div class="ai-content-text">${this.formatMarkdown(block.content)}</div>
-        <div class="ai-content-footer">
-          <span class="ai-generated-label">AI Generated</span>
-          <button class="regenerate-btn" data-block-id="${block.id}">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M23 4v6h-6"></path>
-              <path d="M1 20v-6h6"></path>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-            </svg>
-            Regenerate
-          </button>
-        </div>
+        <div class="ai-content-text ${isEditing ? 'editable-active' : ''}"
+             contenteditable="${isEditing ? 'true' : 'false'}"
+             data-block-id="${block.id}">${this.formatMarkdown(block.content)}</div>
       </div>
     `;
   }
@@ -477,18 +498,18 @@ export class BlockEditor {
     }
   }
 
-  renderLatexBlock(block) {
+  renderLatexBlock(block, isEditing) {
     return `
       <div class="latex-wrapper">
-        <div class="latex-display" data-latex="${this.escapeHtml(block.content)}">$$${block.content}$$</div>
-        <div class="latex-edit-zone" style="display: none;">
-          <textarea class="latex-editor" data-block-id="${block.id}">${block.content}</textarea>
+        <div class="latex-display ${isEditing ? 'hidden' : ''}" data-latex="${this.escapeHtml(block.content)}">$$${block.content}$$</div>
+        <div class="latex-edit-zone ${isEditing ? 'active' : ''}">
+          <textarea class="latex-editor" data-block-id="${block.id}" placeholder="Enter LaTeX...">${block.content}</textarea>
         </div>
       </div>
     `;
   }
 
-  renderCodeBlock(block) {
+  renderCodeBlock(block, isEditing) {
     const lang = block.metadata.language || "text";
     return `
       <div class="code-wrapper">
@@ -496,30 +517,29 @@ export class BlockEditor {
           <span class="code-language">${lang}</span>
           <button class="copy-code-btn" title="Copy code">Copy</button>
         </div>
-        <pre class="code-display"><code class="language-${lang}">${this.escapeHtml(block.content)}</code></pre>
-        <textarea class="code-editor" style="display: none;" data-block-id="${block.id}">${block.content}</textarea>
+        <pre class="code-display ${isEditing ? 'hidden' : ''}"><code class="language-${lang}">${this.escapeHtml(block.content)}</code></pre>
+        <textarea class="code-editor ${isEditing ? 'active' : ''}" data-block-id="${block.id}">${block.content}</textarea>
       </div>
     `;
   }
 
-  renderCalloutBlock(block) {
+  renderCalloutBlock(block, isEditing) {
     const type = block.metadata.calloutType || "info";
     const title = block.metadata.title || "Note";
-    const icons = {
-      info: "i",
-      tip: "lightbulb",
-      warning: "alert-triangle",
-      definition: "book-open",
-      example: "code"
-    };
 
     return `
       <div class="callout-wrapper callout-${type}">
         <div class="callout-header">
           <span class="callout-icon">${this.getCalloutIcon(type)}</span>
-          <span class="callout-title" contenteditable="true" data-block-id="${block.id}" data-field="title">${title}</span>
+          <span class="callout-title ${isEditing ? 'editable-active' : ''}"
+                contenteditable="${isEditing ? 'true' : 'false'}"
+                data-block-id="${block.id}"
+                data-field="title">${title}</span>
         </div>
-        <div class="callout-body" contenteditable="true" data-block-id="${block.id}" data-field="content">${this.formatMarkdown(block.content)}</div>
+        <div class="callout-body ${isEditing ? 'editable-active' : ''}"
+             contenteditable="${isEditing ? 'true' : 'false'}"
+             data-block-id="${block.id}"
+             data-field="content">${this.formatMarkdown(block.content)}</div>
       </div>
     `;
   }
@@ -539,35 +559,20 @@ export class BlockEditor {
     return `<hr class="block-divider" />`;
   }
 
-  renderAddBlockButton(afterIndex) {
-    return `
-      <div class="add-block-inline" data-after-index="${afterIndex}">
-        <button class="add-block-line-btn" title="Add block here">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-        </button>
-      </div>
-    `;
-  }
-
   /**
    * Attach event listeners
    */
   attachEventListeners() {
     if (!this.container) return;
 
-    // Add block buttons
-    this.container.querySelectorAll(".add-block-btn, .add-block-line-btn").forEach((btn) => {
+    // Add block divider triggers
+    this.container.querySelectorAll(".add-block-trigger").forEach((btn) => {
       btn.addEventListener("click", (e) => {
+        e.stopPropagation();
         const afterIndex = parseInt(e.target.closest("[data-after-index]")?.dataset.afterIndex ?? this.blocks.length);
         this.showBlockTypeMenu(e.target, afterIndex);
       });
     });
-
-    // Save button
-    this.container.querySelector(".save-btn")?.addEventListener("click", () => this.saveBlocks());
 
     // Block actions
     this.container.querySelectorAll(".block-action-btn").forEach((btn) => {
@@ -578,13 +583,15 @@ export class BlockEditor {
         const blockId = blockWrapper?.dataset.blockId;
 
         if (action === "delete") this.deleteBlock(blockId);
-        else if (action === "edit") this.editBlock(blockId);
+        else if (action === "edit") this.enterEditMode(blockId);
+        else if (action === "done") this.exitEditMode(blockId, true);
+        else if (action === "cancel") this.exitEditMode(blockId, false);
         else if (action === "ai") this.showAiMenu(btn, blockId);
       });
     });
 
-    // Contenteditable changes
-    this.container.querySelectorAll("[contenteditable]").forEach((el) => {
+    // Contenteditable changes - only for blocks in edit mode
+    this.container.querySelectorAll("[contenteditable='true']").forEach((el) => {
       el.addEventListener("input", (e) => {
         const blockId = el.dataset.blockId;
         const field = el.dataset.field || "content";
@@ -600,7 +607,37 @@ export class BlockEditor {
           if (blockType === "heading") {
             e.preventDefault();
             const index = parseInt(blockWrapper.dataset.blockIndex);
+            this.exitEditMode(blockWrapper.dataset.blockId, true);
             this.addBlock("text", "", {}, index + 1);
+          }
+        }
+
+        // Escape to cancel edit
+        if (e.key === "Escape") {
+          const blockWrapper = el.closest(".block-wrapper");
+          if (blockWrapper) {
+            this.exitEditMode(blockWrapper.dataset.blockId, false);
+          }
+        }
+      });
+    });
+
+    // Textarea changes for code/latex blocks
+    this.container.querySelectorAll(".code-editor, .latex-editor").forEach((editor) => {
+      editor.addEventListener("input", (e) => {
+        const blockId = editor.dataset.blockId;
+        const block = this.blocks.find(b => b.id === blockId);
+        if (block) {
+          block.content = editor.value;
+          block.metadata.updatedAt = new Date().toISOString();
+        }
+      });
+
+      editor.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          const blockWrapper = editor.closest(".block-wrapper");
+          if (blockWrapper) {
+            this.exitEditMode(blockWrapper.dataset.blockId, false);
           }
         }
       });
@@ -645,11 +682,6 @@ export class BlockEditor {
       btn.addEventListener("click", () => this.explainImage(btn.dataset.blockId));
     });
 
-    // Regenerate buttons
-    this.container.querySelectorAll(".regenerate-btn").forEach((btn) => {
-      btn.addEventListener("click", () => this.regenerateContent(btn.dataset.blockId));
-    });
-
     // Copy code buttons
     this.container.querySelectorAll(".copy-code-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -664,6 +696,62 @@ export class BlockEditor {
 
     // Drag and drop for reordering
     this.setupDragAndDrop();
+
+    // Click outside to save and exit edit mode
+    document.addEventListener("click", (e) => {
+      if (this.editingBlockId && !e.target.closest(".block-wrapper")) {
+        this.exitEditMode(this.editingBlockId, true);
+      }
+    });
+  }
+
+  /**
+   * Enter edit mode for a block
+   */
+  enterEditMode(blockId) {
+    // Exit any existing edit mode first
+    if (this.editingBlockId && this.editingBlockId !== blockId) {
+      this.exitEditMode(this.editingBlockId, true);
+    }
+
+    this.editingBlockId = blockId;
+    this.render();
+
+    // Focus the editable element
+    setTimeout(() => {
+      const blockEl = this.container.querySelector(`[data-block-id="${blockId}"]`);
+      if (blockEl) {
+        const editable = blockEl.querySelector("[contenteditable='true']") ||
+                         blockEl.querySelector(".code-editor.active") ||
+                         blockEl.querySelector(".latex-editor");
+        if (editable) {
+          editable.focus();
+          // Place cursor at end for contenteditable
+          if (editable.contentEditable === 'true') {
+            const range = document.createRange();
+            range.selectNodeContents(editable);
+            range.collapse(false);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+        }
+      }
+    }, 50);
+  }
+
+  /**
+   * Exit edit mode for a block
+   */
+  exitEditMode(blockId, save = true) {
+    if (this.editingBlockId !== blockId) return;
+
+    if (save) {
+      this.triggerAutoSave();
+    }
+
+    this.editingBlockId = null;
+    this.render();
   }
 
   /**
@@ -759,14 +847,16 @@ export class BlockEditor {
     const rect = trigger.getBoundingClientRect();
     menu.style.position = "fixed";
     menu.style.top = `${rect.bottom + 8}px`;
-    menu.style.left = `${rect.left}px`;
+    menu.style.left = `${Math.max(rect.left - 80, 16)}px`;
     document.body.appendChild(menu);
 
     // Event listeners
     menu.querySelectorAll(".block-type-option").forEach((option) => {
       option.addEventListener("click", () => {
-        this.addBlock(option.dataset.type, "", {}, afterIndex);
+        const newBlock = this.addBlock(option.dataset.type, "", {}, afterIndex);
         menu.remove();
+        // Immediately enter edit mode for the new block
+        setTimeout(() => this.enterEditMode(newBlock.id), 100);
       });
     });
 
@@ -787,7 +877,7 @@ export class BlockEditor {
   }
 
   /**
-   * Show AI actions menu
+   * Show AI actions menu - contextual and concise
    */
   showAiMenu(trigger, blockId) {
     document.querySelector(".ai-actions-menu")?.remove();
@@ -798,48 +888,77 @@ export class BlockEditor {
     const menu = document.createElement("div");
     menu.className = "ai-actions-menu";
     menu.innerHTML = `
-      <div class="ai-menu-header">AI Actions</div>
+      <div class="ai-menu-header">
+        <span class="ai-header-icon">AI</span>
+        <span>How can I help?</span>
+      </div>
+      <div class="ai-menu-description">Actions are context-aware and concise</div>
       <button class="ai-menu-item" data-action="explain">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-          <line x1="12" y1="17" x2="12.01" y2="17"></line>
-        </svg>
-        Explain this
+        <div class="ai-menu-item-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </div>
+        <div class="ai-menu-item-content">
+          <span class="ai-menu-item-title">Explain this</span>
+          <span class="ai-menu-item-desc">Brief clarification (2-4 sentences)</span>
+        </div>
       </button>
       <button class="ai-menu-item" data-action="simplify">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="4" y1="21" x2="4" y2="14"></line>
-          <line x1="4" y1="10" x2="4" y2="3"></line>
-          <line x1="12" y1="21" x2="12" y2="12"></line>
-          <line x1="12" y1="8" x2="12" y2="3"></line>
-        </svg>
-        Simplify
+        <div class="ai-menu-item-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12a9 9 0 1 1-9-9"></path>
+            <path d="M12 7v5l3 3"></path>
+          </svg>
+        </div>
+        <div class="ai-menu-item-content">
+          <span class="ai-menu-item-title">Simplify</span>
+          <span class="ai-menu-item-desc">Same or shorter, easier to understand</span>
+        </div>
       </button>
       <button class="ai-menu-item" data-action="expand">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="15 3 21 3 21 9"></polyline>
-          <polyline points="9 21 3 21 3 15"></polyline>
-          <line x1="21" y1="3" x2="14" y2="10"></line>
-          <line x1="3" y1="21" x2="10" y2="14"></line>
-        </svg>
-        Expand/Add details
+        <div class="ai-menu-item-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <polyline points="9 21 3 21 3 15"></polyline>
+            <line x1="21" y1="3" x2="14" y2="10"></line>
+            <line x1="3" y1="21" x2="10" y2="14"></line>
+          </svg>
+        </div>
+        <div class="ai-menu-item-content">
+          <span class="ai-menu-item-title">Add details</span>
+          <span class="ai-menu-item-desc">Incremental depth, not a rewrite</span>
+        </div>
       </button>
       <button class="ai-menu-item" data-action="examples">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-          <polyline points="2 17 12 22 22 17"></polyline>
-          <polyline points="2 12 12 17 22 12"></polyline>
-        </svg>
-        Add examples
+        <div class="ai-menu-item-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+          </svg>
+        </div>
+        <div class="ai-menu-item-content">
+          <span class="ai-menu-item-title">Add examples</span>
+          <span class="ai-menu-item-desc">1-2 relevant, practical examples</span>
+        </div>
       </button>
-      <button class="ai-menu-item" data-action="regenerate">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M23 4v6h-6"></path>
-          <path d="M1 20v-6h6"></path>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-        </svg>
-        Regenerate
+      <div class="ai-menu-divider"></div>
+      <button class="ai-menu-item ai-menu-item-secondary" data-action="regenerate">
+        <div class="ai-menu-item-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6"></path>
+            <path d="M1 20v-6h6"></path>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+        </div>
+        <div class="ai-menu-item-content">
+          <span class="ai-menu-item-title">Regenerate</span>
+          <span class="ai-menu-item-desc">Rewrite for clarity</span>
+        </div>
       </button>
     `;
 
@@ -868,7 +987,7 @@ export class BlockEditor {
   }
 
   /**
-   * Handle AI actions on a block
+   * Handle AI actions on a block - contextual and concise
    */
   async handleAiAction(blockId, action) {
     const block = this.blocks.find((b) => b.id === blockId);
@@ -881,6 +1000,12 @@ export class BlockEditor {
 
     try {
       const token = localStorage.getItem("token");
+
+      // Get surrounding context for better AI responses
+      const blockIndex = this.blocks.findIndex((b) => b.id === blockId);
+      const contextBlocks = this.blocks.slice(Math.max(0, blockIndex - 2), blockIndex + 1);
+      const context = contextBlocks.map(b => b.content).join("\n\n");
+
       const response = await fetch("http://localhost:5000/api/content-requests/ai-action", {
         method: "POST",
         headers: {
@@ -892,7 +1017,8 @@ export class BlockEditor {
           content: block.content,
           blockType: block.type,
           subtopicId: this.subtopicId,
-          sessionId: this.sessionId
+          sessionId: this.sessionId,
+          context: context
         })
       });
 
@@ -901,17 +1027,36 @@ export class BlockEditor {
       const result = await response.json();
       const generatedContent = result.data.content;
 
+      // Action labels for display
+      const actionLabels = {
+        explain: "Explanation",
+        simplify: "Simplified",
+        expand: "Details",
+        examples: "Examples",
+        regenerate: "Regenerated"
+      };
+
       // Handle the response based on action
       if (action === "explain" || action === "expand" || action === "examples") {
-        // Add new AI block after current block
+        // Add new AI block after current block with label
         const blockIndex = this.blocks.findIndex((b) => b.id === blockId);
-        this.addBlock("ai_content", generatedContent, { isAiGenerated: true }, blockIndex + 1);
+        const newBlock = this.createBlock("ai_content", generatedContent, {
+          isAiGenerated: true,
+          aiActionLabel: actionLabels[action],
+          sourceBlockId: blockId
+        });
+        this.blocks.splice(blockIndex + 1, 0, newBlock);
+        this.render();
       } else if (action === "simplify" || action === "regenerate") {
         // Replace current block content
         block.content = generatedContent;
         block.metadata.updatedAt = new Date().toISOString();
+        block.metadata.aiActionLabel = actionLabels[action];
         this.render();
       }
+
+      // Save immediately for AI-generated content (no debounce)
+      await this.saveBlocks();
     } catch (error) {
       console.error("AI action error:", error);
       this.showNotification("AI action failed. Please try again.", "error");
@@ -986,7 +1131,10 @@ export class BlockEditor {
         if (!response.ok) throw new Error("Generation failed");
 
         const result = await response.json();
-        this.addBlock("ai_content", result.data.content, { isAiGenerated: true }, afterIndex);
+        this.addBlock("ai_content", result.data.content, {
+          isAiGenerated: true,
+          aiActionLabel: "Generated"
+        }, afterIndex);
         dialog.remove();
       } catch (error) {
         console.error("AI generation error:", error);
@@ -1064,7 +1212,7 @@ export class BlockEditor {
   addBlock(type, content = "", metadata = {}, afterIndex = null) {
     const newBlock = this.createBlock(type, content, metadata);
 
-    if (afterIndex !== null && afterIndex < this.blocks.length) {
+    if (afterIndex !== null && afterIndex <= this.blocks.length) {
       this.blocks.splice(afterIndex, 0, newBlock);
     } else {
       this.blocks.push(newBlock);
@@ -1072,12 +1220,6 @@ export class BlockEditor {
 
     this.render();
     this.triggerAutoSave();
-
-    // Focus new block if it's editable
-    setTimeout(() => {
-      const newBlockEl = this.container.querySelector(`[data-block-id="${newBlock.id}"] [contenteditable]`);
-      newBlockEl?.focus();
-    }, 100);
 
     return newBlock;
   }
@@ -1116,68 +1258,6 @@ export class BlockEditor {
     this.blocks.splice(index, 1);
     this.render();
     this.triggerAutoSave();
-  }
-
-  /**
-   * Edit a block (toggle edit mode for special blocks)
-   */
-  editBlock(blockId) {
-    const block = this.blocks.find((b) => b.id === blockId);
-    if (!block) return;
-
-    const blockElement = this.container.querySelector(`[data-block-id="${blockId}"]`)?.closest(".block");
-    if (!blockElement) return;
-
-    if (block.type === "latex") {
-      const display = blockElement.querySelector(".latex-display");
-      const editor = blockElement.querySelector(".latex-edit-zone");
-      const textarea = editor?.querySelector("textarea");
-
-      if (display && editor) {
-        const isEditing = editor.style.display !== "none";
-        display.style.display = isEditing ? "block" : "none";
-        editor.style.display = isEditing ? "none" : "block";
-
-        if (!isEditing && textarea) {
-          textarea.focus();
-          textarea.addEventListener("blur", () => {
-            block.content = textarea.value;
-            display.innerHTML = `$$${textarea.value}$$`;
-            display.style.display = "block";
-            editor.style.display = "none";
-            this.renderMathInBlocks();
-            this.triggerAutoSave();
-          }, { once: true });
-        }
-      }
-    } else if (block.type === "code") {
-      const display = blockElement.querySelector(".code-display");
-      const editor = blockElement.querySelector(".code-editor");
-
-      if (display && editor) {
-        const isEditing = editor.style.display !== "none";
-        display.style.display = isEditing ? "block" : "none";
-        editor.style.display = isEditing ? "none" : "block";
-
-        if (!isEditing) {
-          editor.focus();
-          editor.addEventListener("blur", () => {
-            block.content = editor.value;
-            display.querySelector("code").textContent = editor.value;
-            display.style.display = "block";
-            editor.style.display = "none";
-            this.triggerAutoSave();
-          }, { once: true });
-        }
-      }
-    }
-  }
-
-  /**
-   * Regenerate AI content
-   */
-  async regenerateContent(blockId) {
-    await this.handleAiAction(blockId, "regenerate");
   }
 
   /**
