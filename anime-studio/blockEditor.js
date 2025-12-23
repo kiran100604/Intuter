@@ -40,18 +40,18 @@ export class BlockEditor {
       return;
     }
 
-    // If we have existing content (from AI generation), convert it to blocks
-    if (existingContent && Object.keys(existingContent).length > 0) {
+    // ALWAYS try to load saved blocks first (preserves user edits and AI modifications)
+    const savedBlocks = await this.loadBlocks();
+    if (savedBlocks && savedBlocks.length > 0) {
+      this.blocks = savedBlocks;
+    } else if (existingContent && Object.keys(existingContent).length > 0) {
+      // Only use existing content if no saved blocks (first time viewing)
       this.blocks = this.convertContentToBlocks(existingContent);
+      // Save immediately so future loads will use saved blocks
+      await this.saveBlocks();
     } else {
-      // Try to load saved blocks from backend
-      const savedBlocks = await this.loadBlocks();
-      if (savedBlocks && savedBlocks.length > 0) {
-        this.blocks = savedBlocks;
-      } else {
-        // Start with an empty text block
-        this.blocks = [this.createBlock("text", "")];
-      }
+      // Start with an empty text block
+      this.blocks = [this.createBlock("text", "")];
     }
 
     this.render();
