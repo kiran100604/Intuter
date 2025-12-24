@@ -14,8 +14,9 @@ export class BlockEditor {
     this.autoSaveTimeout = null;
     this.editingBlockId = null; // Track which block is in edit mode
 
-    // Block types configuration
+    // Block types configuration - includes semantic types for AI-generated content
     this.blockTypes = {
+      // Basic block types
       text: { icon: "T", label: "Text", color: "#3b82f6" },
       heading: { icon: "H", label: "Heading", color: "#8b5cf6" },
       ai_content: { icon: "AI", label: "AI Generated", color: "#f97316" },
@@ -24,7 +25,36 @@ export class BlockEditor {
       latex: { icon: "fn", label: "Math/LaTeX", color: "#ec4899" },
       code: { icon: "</>", label: "Code", color: "#06b6d4" },
       callout: { icon: "!", label: "Callout", color: "#f59e0b" },
-      divider: { icon: "—", label: "Divider", color: "#71717a" }
+      divider: { icon: "—", label: "Divider", color: "#71717a" },
+      // Semantic block types for structured educational content
+      context: { icon: "🌍", label: "Context", color: "#06b6d4" },
+      intuition: { icon: "💡", label: "Intuition", color: "#8b5cf6" },
+      definition: { icon: "🔑", label: "Definition", color: "#f59e0b" },
+      theorem: { icon: "📐", label: "Theorem", color: "#6366f1" },
+      example: { icon: "🔬", label: "Example", color: "#10b981" },
+      insight: { icon: "✨", label: "Insight", color: "#f97316" },
+      warning: { icon: "⚠️", label: "Warning", color: "#ef4444" },
+      summary: { icon: "📝", label: "Summary", color: "#3b82f6" },
+      concept: { icon: "🧠", label: "Concept", color: "#8b5cf6" },
+      formula: { icon: "∑", label: "Formula", color: "#ec4899" }
+    };
+
+    // Context-aware actions per semantic block type
+    this.semanticActions = {
+      context: ['simplify', 'add examples', 'make it relevant to my field'],
+      intuition: ['explain more', 'give me an analogy', 'show visual representation'],
+      definition: ['explain this', 'add intuition', 'show me an example', 'why is this true?'],
+      theorem: ['prove this', 'explain intuitively', 'when does this apply?', 'show counterexample'],
+      example: ['explain step by step', 'show a simpler example', 'show a harder example'],
+      formula: ['derive this', 'explain each term', 'when to use this?', 'show example'],
+      insight: ['explain more', 'give an example', 'why is this useful?'],
+      warning: ['explain the mistake', 'show correct approach', 'give example of error'],
+      summary: ['expand on a point', 'add more takeaways', 'simplify'],
+      concept: ['explain simpler', 'add examples', 'connect to other concepts'],
+      // Fallback for non-semantic types
+      text: ['explain', 'simplify', 'expand', 'add examples'],
+      callout: ['explain', 'simplify', 'add examples'],
+      ai_content: ['explain', 'simplify', 'expand', 'add examples']
     };
   }
 
@@ -91,9 +121,47 @@ export class BlockEditor {
   }
 
   /**
+   * Parse semantic blocks from AI-generated content with <!-- BLOCK --> markers
+   * Returns null if no semantic blocks found (falls back to markdown parsing)
+   */
+  parseSemanticBlocks(content, isAiGenerated = false) {
+    const blockRegex = /<!-- BLOCK: type="(\w+)" title="([^"]*)" -->([\s\S]*?)<!-- END BLOCK -->/g;
+    const blocks = [];
+    let match;
+
+    while ((match = blockRegex.exec(content)) !== null) {
+      const blockType = match[1];
+      const blockTitle = match[2];
+      const blockContent = match[3].trim();
+
+      // Skip empty blocks
+      if (!blockContent) continue;
+
+      // Create block with semantic type
+      blocks.push(this.createBlock(blockType, blockContent, {
+        isAiGenerated,
+        semanticType: blockType,
+        title: blockTitle,
+        isSemanticBlock: true
+      }));
+    }
+
+    // Return null if no semantic blocks found (will fall back to markdown parsing)
+    return blocks.length > 0 ? blocks : null;
+  }
+
+  /**
    * Parse markdown-like content into blocks
+   * First tries semantic block parsing, then falls back to markdown
    */
   parseContentIntoBlocks(content, isAiGenerated = false) {
+    // First, try to parse semantic blocks
+    const semanticBlocks = this.parseSemanticBlocks(content, isAiGenerated);
+    if (semanticBlocks && semanticBlocks.length > 0) {
+      return semanticBlocks;
+    }
+
+    // Fall back to markdown-based parsing
     const blocks = [];
     const lines = content.split("\n");
     let currentText = [];
@@ -294,36 +362,43 @@ export class BlockEditor {
 
     let contentHtml = "";
 
-    switch (block.type) {
-      case "text":
-        contentHtml = this.renderTextBlock(block, isEditing);
-        break;
-      case "heading":
-        contentHtml = this.renderHeadingBlock(block, isEditing);
-        break;
-      case "ai_content":
-        contentHtml = this.renderAiContentBlock(block, isEditing);
-        break;
-      case "image":
-        contentHtml = this.renderImageBlock(block);
-        break;
-      case "video":
-        contentHtml = this.renderVideoBlock(block);
-        break;
-      case "latex":
-        contentHtml = this.renderLatexBlock(block, isEditing);
-        break;
-      case "code":
-        contentHtml = this.renderCodeBlock(block, isEditing);
-        break;
-      case "callout":
-        contentHtml = this.renderCalloutBlock(block, isEditing);
-        break;
-      case "divider":
-        contentHtml = this.renderDividerBlock(block);
-        break;
-      default:
-        contentHtml = this.renderTextBlock(block, isEditing);
+    // Check if this is a semantic block type
+    const semanticTypes = ['context', 'intuition', 'definition', 'theorem', 'example', 'insight', 'warning', 'summary', 'concept', 'formula'];
+
+    if (semanticTypes.includes(block.type)) {
+      contentHtml = this.renderSemanticBlock(block, isEditing);
+    } else {
+      switch (block.type) {
+        case "text":
+          contentHtml = this.renderTextBlock(block, isEditing);
+          break;
+        case "heading":
+          contentHtml = this.renderHeadingBlock(block, isEditing);
+          break;
+        case "ai_content":
+          contentHtml = this.renderAiContentBlock(block, isEditing);
+          break;
+        case "image":
+          contentHtml = this.renderImageBlock(block);
+          break;
+        case "video":
+          contentHtml = this.renderVideoBlock(block);
+          break;
+        case "latex":
+          contentHtml = this.renderLatexBlock(block, isEditing);
+          break;
+        case "code":
+          contentHtml = this.renderCodeBlock(block, isEditing);
+          break;
+        case "callout":
+          contentHtml = this.renderCalloutBlock(block, isEditing);
+          break;
+        case "divider":
+          contentHtml = this.renderDividerBlock(block);
+          break;
+        default:
+          contentHtml = this.renderTextBlock(block, isEditing);
+      }
     }
 
     return `
@@ -557,6 +632,50 @@ export class BlockEditor {
 
   renderDividerBlock(block) {
     return `<hr class="block-divider" />`;
+  }
+
+  /**
+   * Render a semantic block (context, intuition, definition, theorem, example, etc.)
+   */
+  renderSemanticBlock(block, isEditing) {
+    const typeConfig = this.blockTypes[block.type] || this.blockTypes.text;
+    const title = block.metadata.title || typeConfig.label;
+    const icon = typeConfig.icon;
+    const color = typeConfig.color;
+
+    // Map semantic types to visual styles
+    const styleMap = {
+      context: { bgClass: 'semantic-context', borderStyle: 'left' },
+      intuition: { bgClass: 'semantic-intuition', borderStyle: 'left' },
+      definition: { bgClass: 'semantic-definition', borderStyle: 'accent' },
+      theorem: { bgClass: 'semantic-theorem', borderStyle: 'accent' },
+      example: { bgClass: 'semantic-example', borderStyle: 'full' },
+      insight: { bgClass: 'semantic-insight', borderStyle: 'glow' },
+      warning: { bgClass: 'semantic-warning', borderStyle: 'left' },
+      summary: { bgClass: 'semantic-summary', borderStyle: 'top' },
+      concept: { bgClass: 'semantic-concept', borderStyle: 'left' },
+      formula: { bgClass: 'semantic-formula', borderStyle: 'accent' }
+    };
+
+    const style = styleMap[block.type] || { bgClass: 'semantic-default', borderStyle: 'left' };
+
+    return `
+      <div class="semantic-block ${style.bgClass} border-${style.borderStyle}"
+           style="--semantic-color: ${color}">
+        <div class="semantic-header">
+          <span class="semantic-icon" style="background: ${color}20; color: ${color}">${icon}</span>
+          <span class="semantic-title ${isEditing ? 'editable-active' : ''}"
+                contenteditable="${isEditing ? 'true' : 'false'}"
+                data-block-id="${block.id}"
+                data-field="title">${title}</span>
+          <span class="semantic-type-badge" style="background: ${color}15; color: ${color}">${typeConfig.label}</span>
+        </div>
+        <div class="semantic-content ${isEditing ? 'editable-active' : ''}"
+             contenteditable="${isEditing ? 'true' : 'false'}"
+             data-block-id="${block.id}"
+             data-field="content">${this.formatMarkdown(block.content)}</div>
+      </div>
+    `;
   }
 
   /**
@@ -877,7 +996,93 @@ export class BlockEditor {
   }
 
   /**
-   * Show AI actions menu - contextual and concise
+   * Get action icon SVG by action name
+   */
+  getActionIcon(action) {
+    const icons = {
+      'explain': '<circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line>',
+      'explain this': '<circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line>',
+      'explain more': '<circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line>',
+      'simplify': '<path d="M21 12a9 9 0 1 1-9-9"></path><path d="M12 7v5l3 3"></path>',
+      'explain simpler': '<path d="M21 12a9 9 0 1 1-9-9"></path><path d="M12 7v5l3 3"></path>',
+      'expand': '<polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line>',
+      'add examples': '<rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect>',
+      'examples': '<rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect>',
+      'give an example': '<rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect>',
+      'show example': '<rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect>',
+      'show me an example': '<rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect>',
+      'add intuition': '<path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>',
+      'give me an analogy': '<path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83"></path><circle cx="12" cy="12" r="4"></circle>',
+      'prove this': '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="9" y1="15" x2="15" y2="15"></line>',
+      'explain intuitively': '<path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83"></path><circle cx="12" cy="12" r="4"></circle>',
+      'when does this apply?': '<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>',
+      'when to use this?': '<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>',
+      'why is this true?': '<circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line>',
+      'why is this useful?': '<circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line>',
+      'explain step by step': '<line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line>',
+      'show a simpler example': '<path d="M21 12a9 9 0 1 1-9-9"></path><rect x="8" y="8" width="8" height="8"></rect>',
+      'show a harder example': '<polyline points="15 3 21 3 21 9"></polyline><rect x="3" y="11" width="10" height="10"></rect>',
+      'derive this': '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><line x1="9" y1="11" x2="15" y2="11"></line><line x1="9" y1="15" x2="15" y2="15"></line>',
+      'explain each term': '<line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line>',
+      'explain the mistake': '<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>',
+      'show correct approach': '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>',
+      'give example of error': '<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line>',
+      'show counterexample': '<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line>',
+      'expand on a point': '<polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line>',
+      'add more takeaways': '<line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>',
+      'connect to other concepts': '<circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>',
+      'make it relevant to my field': '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10"></path>',
+      'show visual representation': '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline>',
+      'regenerate': '<path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>'
+    };
+    return icons[action.toLowerCase()] || icons['explain'];
+  }
+
+  /**
+   * Get action description by action name
+   */
+  getActionDescription(action) {
+    const descriptions = {
+      'explain': 'Brief clarification (2-4 sentences)',
+      'explain this': 'Brief clarification (2-4 sentences)',
+      'explain more': 'More depth on this topic',
+      'simplify': 'Same or shorter, easier to understand',
+      'explain simpler': 'Same or shorter, easier to understand',
+      'expand': 'Incremental depth, not a rewrite',
+      'add examples': '1-2 relevant, practical examples',
+      'examples': '1-2 relevant, practical examples',
+      'give an example': 'A concrete example',
+      'show example': 'A worked example',
+      'show me an example': 'A practical example',
+      'add intuition': 'Build mental models',
+      'give me an analogy': 'Relatable comparison',
+      'prove this': 'Formal proof or justification',
+      'explain intuitively': 'Plain language explanation',
+      'when does this apply?': 'Conditions and use cases',
+      'when to use this?': 'Practical applications',
+      'why is this true?': 'Underlying reasoning',
+      'why is this useful?': 'Practical value',
+      'explain step by step': 'Detailed walkthrough',
+      'show a simpler example': 'Easier version',
+      'show a harder example': 'More challenging version',
+      'derive this': 'Show the derivation',
+      'explain each term': 'Break down components',
+      'explain the mistake': 'What went wrong',
+      'show correct approach': 'The right way',
+      'give example of error': 'Common mistake example',
+      'show counterexample': 'When this fails',
+      'expand on a point': 'More detail on specific aspect',
+      'add more takeaways': 'Additional key points',
+      'connect to other concepts': 'Related topics',
+      'make it relevant to my field': 'Domain-specific context',
+      'show visual representation': 'Diagram or visualization',
+      'regenerate': 'Rewrite for clarity'
+    };
+    return descriptions[action.toLowerCase()] || 'AI assistance';
+  }
+
+  /**
+   * Show AI actions menu - contextual and concise based on block type
    */
   showAiMenu(trigger, blockId) {
     document.querySelector(".ai-actions-menu")?.remove();
@@ -885,74 +1090,41 @@ export class BlockEditor {
     const block = this.blocks.find((b) => b.id === blockId);
     if (!block) return;
 
+    // Get context-aware actions based on block type
+    const blockType = block.type;
+    const actions = this.semanticActions[blockType] || this.semanticActions.text;
+    const typeConfig = this.blockTypes[blockType] || this.blockTypes.text;
+
     const menu = document.createElement("div");
     menu.className = "ai-actions-menu";
+
+    // Build action buttons HTML
+    const actionButtonsHtml = actions.map(action => `
+      <button class="ai-menu-item" data-action="${action}">
+        <div class="ai-menu-item-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            ${this.getActionIcon(action)}
+          </svg>
+        </div>
+        <div class="ai-menu-item-content">
+          <span class="ai-menu-item-title">${action.charAt(0).toUpperCase() + action.slice(1)}</span>
+          <span class="ai-menu-item-desc">${this.getActionDescription(action)}</span>
+        </div>
+      </button>
+    `).join('');
+
     menu.innerHTML = `
       <div class="ai-menu-header">
-        <span class="ai-header-icon">AI</span>
-        <span>How can I help?</span>
+        <span class="ai-header-icon" style="background: ${typeConfig.color}20; color: ${typeConfig.color}">${typeConfig.icon}</span>
+        <span>Actions for ${typeConfig.label}</span>
       </div>
-      <div class="ai-menu-description">Actions are context-aware and concise</div>
-      <button class="ai-menu-item" data-action="explain">
-        <div class="ai-menu-item-icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-          </svg>
-        </div>
-        <div class="ai-menu-item-content">
-          <span class="ai-menu-item-title">Explain this</span>
-          <span class="ai-menu-item-desc">Brief clarification (2-4 sentences)</span>
-        </div>
-      </button>
-      <button class="ai-menu-item" data-action="simplify">
-        <div class="ai-menu-item-icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12a9 9 0 1 1-9-9"></path>
-            <path d="M12 7v5l3 3"></path>
-          </svg>
-        </div>
-        <div class="ai-menu-item-content">
-          <span class="ai-menu-item-title">Simplify</span>
-          <span class="ai-menu-item-desc">Same or shorter, easier to understand</span>
-        </div>
-      </button>
-      <button class="ai-menu-item" data-action="expand">
-        <div class="ai-menu-item-icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="15 3 21 3 21 9"></polyline>
-            <polyline points="9 21 3 21 3 15"></polyline>
-            <line x1="21" y1="3" x2="14" y2="10"></line>
-            <line x1="3" y1="21" x2="10" y2="14"></line>
-          </svg>
-        </div>
-        <div class="ai-menu-item-content">
-          <span class="ai-menu-item-title">Add details</span>
-          <span class="ai-menu-item-desc">Incremental depth, not a rewrite</span>
-        </div>
-      </button>
-      <button class="ai-menu-item" data-action="examples">
-        <div class="ai-menu-item-icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7"></rect>
-            <rect x="14" y="3" width="7" height="7"></rect>
-            <rect x="3" y="14" width="7" height="7"></rect>
-            <rect x="14" y="14" width="7" height="7"></rect>
-          </svg>
-        </div>
-        <div class="ai-menu-item-content">
-          <span class="ai-menu-item-title">Add examples</span>
-          <span class="ai-menu-item-desc">1-2 relevant, practical examples</span>
-        </div>
-      </button>
+      <div class="ai-menu-description">Context-aware actions for this ${blockType} block</div>
+      ${actionButtonsHtml}
       <div class="ai-menu-divider"></div>
       <button class="ai-menu-item ai-menu-item-secondary" data-action="regenerate">
         <div class="ai-menu-item-icon">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M23 4v6h-6"></path>
-            <path d="M1 20v-6h6"></path>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            ${this.getActionIcon('regenerate')}
           </svg>
         </div>
         <div class="ai-menu-item-content">

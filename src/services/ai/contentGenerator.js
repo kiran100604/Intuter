@@ -74,18 +74,50 @@ const buildMasterPrompt = (context) => {
 
  ---
 
- # CONTENT STRUCTURE
+ # CONTENT STRUCTURE: INTERACTIVE BLOCKS
+
+ Your content will be displayed in interactive blocks that users can act on
+ (explain further, simplify, add examples, etc.). Structure your output with
+ clear block boundaries using this marker format:
+
+ <!-- BLOCK: type="..." title="..." -->
+ [Your content here]
+ <!-- END BLOCK -->
+
+ ## Block Types (use the most appropriate):
+
+ - \`context\` — Real-world motivation, why this matters
+ - \`intuition\` — Conceptual explanation, mental models
+ - \`definition\` — Formal definition with explanation (keep formula + explanation together)
+ - \`theorem\` — Mathematical property or theorem with proof/justification
+ - \`example\` — Complete worked example (problem through solution)
+ - \`insight\` — Key takeaway, "aha moment", or pro tip
+ - \`warning\` — Common mistake or misconception
+ - \`summary\` — Recap or synthesis
+ - \`concept\` — Core concept explanation
+ - \`formula\` — Mathematical formula with explanation
+
+ ## Critical Block Rules:
+
+ 1. **NEVER separate an equation from its explanation** — they must be in the same block
+ 2. **Examples are single blocks** — all steps of an example stay together
+ 3. **Each block should be self-contained enough that "explain this" makes sense**
+ 4. **Minimum block size: 2-3 sentences or 1 equation + explanation**
+ 5. **Maximum block size: ~300 words** (break larger content into logical sub-blocks)
+ 6. **Every piece of content MUST be inside a block** — no content outside blocks
+
+ ---
 
  ## 1. Real-World Context & Motivation (5-10% of content)
 
  **Purpose**: Answer "Why should anyone care about this?" with genuine conviction.
 
- **What to include**:
- - Start with a concrete, real problem from: engineering, data science, physics, computer graphics, economics, or research
- - Explain what's impossible or inefficient WITHOUT this concept
- - Show what becomes possible WITH this concept
- - Connect to tools/technologies students may have heard of
- - Bridge from familiar ideas they already understand
+ <!-- BLOCK: type="context" title="Why This Matters" -->
+ Start with a concrete, real problem from: engineering, data science, physics,
+ computer graphics, economics, or research. Explain what's impossible or
+ inefficient WITHOUT this concept, and show what becomes possible WITH it.
+ Connect to tools/technologies students may have heard of.
+ <!-- END BLOCK -->
 
  **Quality standards**:
  - Specific enough to be believable (name real applications, not generic "it's useful")
@@ -101,12 +133,10 @@ const buildMasterPrompt = (context) => {
 
  **Purpose**: Build mental models BEFORE formal definitions.
 
- **What to include**:
- - Explain the core idea in plain language first
- - Use 1-2 powerful analogies or visual descriptions
- - Preview the key components without jargon
- - Address the most common initial confusion
- - Set up what's coming in the theory section
+ <!-- BLOCK: type="intuition" title="The Core Idea" -->
+ Explain the core idea in plain language first. Use 1-2 powerful analogies
+ or visual descriptions. Preview the key components without jargon.
+ <!-- END BLOCK -->
 
  **Quality standards**:
  - Accessible to someone who knows the prerequisites but not this topic
@@ -119,92 +149,80 @@ const buildMasterPrompt = (context) => {
 
  **Purpose**: Provide COMPREHENSIVE technical instruction. This is the core.
 
- **Mandatory structure** (use ### headings):
-
  ### 3.1 Precise Definitions
- - State formal mathematical/technical definitions
- - Define EVERY symbol, term, and variable
- - Specify all conditions, constraints, domains
- - Clarify notation conventions you're using
- - Compare to related definitions students know
+ <!-- BLOCK: type="definition" title="[Term Name]" -->
+ State formal mathematical/technical definition with ALL symbols defined.
+ Include the formula AND its explanation in the same block.
+
+ **Example format**:
+ **🔑 Key Definition**: An eigenvalue λ of a matrix A is a scalar such that:
+ $$A\\vec{v} = \\lambda\\vec{v}$$
+ where $\\vec{v}$ is a non-zero vector called the eigenvector.
+ <!-- END BLOCK -->
 
  ### 3.2 Fundamental Concepts
- - Explain the underlying principles in depth
- - Show how components relate and interact
- - Discuss the logic or intuition behind the math
- - Address misconceptions explicitly
- - Build from simple to complex progressively
+ <!-- BLOCK: type="concept" title="[Concept Name]" -->
+ Explain the underlying principles in depth. Show how components relate
+ and interact. Discuss the logic or intuition behind the math.
+ <!-- END BLOCK -->
 
  ### 3.3 Mathematical Framework
- For EACH major formula:
- - State the formula clearly (use LaTeX)
- - Explain what each component represents
- - Show derivation or justify why it's true
- - Discuss when it applies (and when it doesn't)
- - Provide geometric/visual interpretation if possible
+ For EACH major formula, create a formula block:
+ <!-- BLOCK: type="formula" title="[Formula Name]" -->
+ State the formula clearly (use LaTeX), explain what each component represents,
+ show derivation or justify why it's true, and provide geometric interpretation.
+ <!-- END BLOCK -->
 
  ### 3.4 Worked Examples (CRITICAL)
- Include 3-5 examples that:
- - Progress from basic to advanced
- - Show EVERY computational step
- - Explain the reasoning at each decision point
- - Highlight where students commonly make errors
- - Demonstrate different scenarios/edge cases
+ Include 3-5 examples that progress from basic to advanced.
+ **IMPORTANT**: Each complete example is ONE block with all steps together:
 
- **Example template**:
- > **Example 1: Basic Application**
- > Problem: [State clearly]
- > Given: [List what we know]
- > Find: [What we're solving for]
- >
- > Solution:
- > Step 1: [Action]
- > [Show calculation]
- > [Explain why we do this]
- >
- > Step 2: [Action]
- > [Show calculation]
- > [Explain reasoning]
- >
- > Result: [Final answer with units/interpretation]
- > Key insight: [What this demonstrates]
+ <!-- BLOCK: type="example" title="Finding Eigenvalues of a 2×2 Matrix" -->
+ **Problem**: Find the eigenvalues of $A = \\begin{pmatrix} 4 & 1 \\\\ 2 & 3 \\end{pmatrix}$
+
+ **Step 1**: Set up the characteristic equation
+ $$\\det(A - \\lambda I) = 0$$
+
+ **Step 2**: Compute the determinant
+ $$\\det\\begin{pmatrix} 4-\\lambda & 1 \\\\ 2 & 3-\\lambda \\end{pmatrix} = (4-\\lambda)(3-\\lambda) - 2$$
+
+ **Step 3**: Solve the quadratic
+ $$\\lambda^2 - 7\\lambda + 10 = 0$$
+ $$(\\lambda - 5)(\\lambda - 2) = 0$$
+
+ **Result**: $\\lambda_1 = 5$ and $\\lambda_2 = 2$
+ <!-- END BLOCK -->
 
  ### 3.5 Properties & Theorems
- - State important properties with formal notation
- - Provide proofs or justifications
- - Explain practical implications
- - Show how these properties enable applications
+ <!-- BLOCK: type="theorem" title="[Theorem Name]" -->
+ State important properties with formal notation. Provide proofs or
+ justifications. Explain practical implications.
+ <!-- END BLOCK -->
 
- ### 3.6 Computational Aspects
- - Discuss how to calculate efficiently
- - Mention numerical considerations
- - Address common implementation issues
- - Connect to algorithms if relevant
+ ### 3.6 Key Insights & Pro Tips
+ <!-- BLOCK: type="insight" title="[Insight Title]" -->
+ 💡 **Pro Tip**: Share expert insights, shortcuts, or verification methods.
+ Example: For 2×2 matrices, eigenvalues satisfy λ₁ + λ₂ = trace(A) and λ₁ · λ₂ = det(A)
+ <!-- END BLOCK -->
 
- ### 3.7 Connections & Extensions
- - Link to previously learned concepts
- - Preview how this enables future topics
- - Mention advanced generalizations
- - Discuss limitations and edge cases
+ ### 3.7 Common Mistakes to Avoid
+ <!-- BLOCK: type="warning" title="[Warning Title]" -->
+ ⚠️ **Common Pitfall**: Describe the mistake students frequently make,
+ why it happens, and how to avoid it.
+ <!-- END BLOCK -->
 
- **Use these pedagogical markers**:
-
- > **🔑 Key Definition**: [For crucial formal definitions]
-
- > **💡 Intuition**: [For conceptual insights that aid understanding]
-
- > **⚠️ Common Pitfall**: [For mistakes students frequently make]
-
- > **🔬 Example**: [For worked demonstrations]
-
- > **✨ Pro Tip**: [For expert insights and shortcuts]
+ ### 3.8 Connections & Extensions
+ <!-- BLOCK: type="concept" title="Connections to Other Topics" -->
+ Link to previously learned concepts. Preview how this enables future topics.
+ Mention advanced generalizations. Discuss limitations and edge cases.
+ <!-- END BLOCK -->
 
  **Quality standards for theory section**:
  - Complete enough to solve homework problems
  - Detailed enough that steps are reproducible
  - Clear enough for self-study
  - Rigorous enough for university level
- - Approximately 8-12 substantial subsections with examples
+ - Approximately 8-12 substantial blocks with examples
 
  ---
 
@@ -212,13 +230,13 @@ const buildMasterPrompt = (context) => {
 
  **Purpose**: Consolidate learning and show the bigger picture.
 
- **What to include**:
+ <!-- BLOCK: type="summary" title="Key Takeaways" -->
  1. Circle back to the original motivation - how does this concept solve it?
  2. Summarize the 3-5 most critical takeaways
  3. List essential formulas/definitions to memorize
  4. Explain where this fits in ${session.subjectName} overall
  5. Preview what becomes possible now that they know this
- 6. Provide 2-3 directions for further exploration
+ <!-- END BLOCK -->
 
  **Quality standards**:
  - Feels like a satisfying conclusion
