@@ -394,13 +394,18 @@ function getRequestTypeGuidelines(requestType) {
 
 /**
  * Handle AI actions on individual blocks (explain, simplify, expand, examples, regenerate)
+ * Extended to support semantic block-specific actions
  * Focused on being contextual, concise, and purpose-driven like a helpful friend teaching
  */
 exports.handleBlockAction = async ({ action, content, blockType, context }) => {
   try {
-    // Contextual prompts that are concise but COMPLETE - never cut off mid-thought
+    // Normalize action to lowercase for matching
+    const normalizedAction = action.toLowerCase().trim();
+
+    // Comprehensive action prompts for all semantic block actions
     const actionPrompts = {
-      explain: `
+      // === GENERIC ACTIONS ===
+      'explain': `
 You are a helpful friend explaining something to a student who didn't understand a part of what they're reading.
 
 GUIDELINES:
@@ -410,7 +415,27 @@ GUIDELINES:
 - Focus on the "why" and intuition, not formal definitions
 - ALWAYS complete your sentences and thoughts fully
       `,
-      simplify: `
+      'explain this': `
+You are a helpful friend explaining something to a student who didn't understand a part of what they're reading.
+
+GUIDELINES:
+- Give a clear, complete explanation (3-6 sentences is fine)
+- Explain ONLY what's in the content, don't teach the entire topic
+- Use simple, conversational language
+- Focus on the "why" and intuition, not formal definitions
+- ALWAYS complete your sentences and thoughts fully
+      `,
+      'explain more': `
+You are providing deeper explanation for content the student wants to understand better.
+
+GUIDELINES:
+- Add more depth and detail to the explanation
+- Cover aspects that might not be immediately obvious
+- Use examples to illustrate points
+- Connect to related concepts
+- ALWAYS complete your thoughts fully
+      `,
+      'simplify': `
 You are simplifying content for someone who finds the current explanation too complex.
 
 GUIDELINES:
@@ -421,7 +446,17 @@ GUIDELINES:
 - The output should be roughly the same length, just clearer
 - ALWAYS complete your sentences fully - never cut off mid-thought
       `,
-      expand: `
+      'explain simpler': `
+You are simplifying content for someone who finds the current explanation too complex.
+
+GUIDELINES:
+- Rewrite the ENTIRE content in simpler words
+- Keep all the key information, just make it easier to understand
+- Use everyday language, avoid or explain jargon
+- Use analogies to familiar concepts when helpful
+- ALWAYS complete your sentences fully
+      `,
+      'expand': `
 You are adding more depth to content that the student wants to understand better.
 
 GUIDELINES:
@@ -431,7 +466,7 @@ GUIDELINES:
 - Be thorough but focused
 - ALWAYS complete your thoughts fully
       `,
-      examples: `
+      'add examples': `
 You are providing practical examples for content the student is learning.
 
 GUIDELINES:
@@ -441,7 +476,17 @@ GUIDELINES:
 - Use realistic scenarios
 - ALWAYS complete each example fully
       `,
-      regenerate: `
+      'examples': `
+You are providing practical examples for content the student is learning.
+
+GUIDELINES:
+- Provide 2-3 relevant, practical examples
+- Keep examples clear and directly related to the content
+- Show step-by-step when applicable
+- Use realistic scenarios
+- ALWAYS complete each example fully
+      `,
+      'regenerate': `
 You are rewriting content to make it clearer and better structured.
 
 GUIDELINES:
@@ -451,18 +496,313 @@ GUIDELINES:
 - Maintain all educational value
 - ALWAYS output complete, well-formed content
       `,
+
+      // === CONTEXT BLOCK ACTIONS ===
+      'make it relevant to my field': `
+You are adapting the context/motivation to be more relevant to the student's interests.
+
+GUIDELINES:
+- Keep the same core message but use examples from different fields
+- Suggest applications in engineering, data science, physics, economics, or other common fields
+- Make the "why this matters" more compelling and personal
+- Show how this concept is used in real-world professional settings
+- ALWAYS complete your thoughts fully
+      `,
+
+      // === INTUITION BLOCK ACTIONS ===
+      'give me an analogy': `
+You are creating a memorable analogy to help the student understand the concept.
+
+GUIDELINES:
+- Create 1-2 powerful analogies using familiar, everyday experiences
+- Explicitly map parts of the analogy to the concept
+- Note where the analogy breaks down (limitations)
+- Make it memorable and vivid
+- ALWAYS complete your analogy fully
+      `,
+      'show visual representation': `
+You are describing a visual/spatial representation of the concept.
+
+GUIDELINES:
+- Describe what a diagram or visualization would look like
+- Use spatial language ("imagine a graph where...", "picture a tree structure...")
+- Break down complex structures into visual components
+- Suggest what charts, graphs, or diagrams would help
+- ALWAYS complete your descriptions fully
+      `,
+
+      // === DEFINITION BLOCK ACTIONS ===
+      'add intuition': `
+You are adding intuitive understanding to a formal definition.
+
+GUIDELINES:
+- Explain WHY the definition makes sense
+- Use plain language to describe what the formal symbols mean
+- Connect to something the student already knows
+- Explain the "spirit" behind the formalism
+- ALWAYS complete your explanation fully
+      `,
+      'show me an example': `
+You are providing a concrete example for a definition or concept.
+
+GUIDELINES:
+- Give a clear, worked example that illustrates the definition
+- Choose numbers or scenarios that are easy to follow
+- Show how the definition applies step by step
+- Verify that your example satisfies the definition
+- ALWAYS complete the example fully
+      `,
+      'why is this true?': `
+You are explaining the reasoning behind why something is true or defined this way.
+
+GUIDELINES:
+- Explain the underlying logic or motivation
+- Connect to fundamental principles
+- Show why this definition/statement makes sense
+- Address common confusions about why it's true
+- ALWAYS complete your reasoning fully
+      `,
+      'why is this useful?': `
+You are explaining the practical usefulness of a concept or result.
+
+GUIDELINES:
+- Describe real applications where this is used
+- Explain what problems it solves
+- Show what would be difficult or impossible without it
+- Connect to tools or technologies the student may know
+- ALWAYS complete your explanation fully
+      `,
+
+      // === THEOREM BLOCK ACTIONS ===
+      'prove this': `
+You are providing a proof or rigorous justification for a theorem or property.
+
+GUIDELINES:
+- Give a clear, step-by-step proof
+- State assumptions and conditions explicitly
+- Explain the logic at each step
+- Use proper mathematical notation with LaTeX
+- ALWAYS complete the proof fully
+      `,
+      'explain intuitively': `
+You are giving an intuitive explanation of why a theorem or property is true.
+
+GUIDELINES:
+- Explain the "why" in plain language, not formal proof
+- Use geometric or visual intuition when possible
+- Help the student "see" why it must be true
+- Connect to things they already understand
+- ALWAYS complete your intuitive explanation
+      `,
+      'when does this apply?': `
+You are explaining the conditions and scope of when a theorem or rule applies.
+
+GUIDELINES:
+- List the conditions/assumptions required
+- Give examples where it applies
+- Give examples where it does NOT apply
+- Explain edge cases and limitations
+- ALWAYS complete your explanation fully
+      `,
+      'when to use this?': `
+You are explaining when and how to use a formula, theorem, or technique.
+
+GUIDELINES:
+- Describe the situations where this tool is useful
+- Explain the signs that suggest using this approach
+- Compare to alternative approaches
+- Give practical decision-making guidance
+- ALWAYS complete your guidance fully
+      `,
+      'show counterexample': `
+You are providing a counterexample to show limitations or edge cases.
+
+GUIDELINES:
+- Give a clear example where the naive assumption fails
+- Explain why the counterexample works
+- Clarify what conditions are violated
+- Help the student understand the boundaries
+- ALWAYS complete the counterexample fully
+      `,
+
+      // === EXAMPLE BLOCK ACTIONS ===
+      'explain step by step': `
+You are giving a detailed step-by-step walkthrough of the example.
+
+GUIDELINES:
+- Break down each step of the solution
+- Explain the reasoning at each step (not just what, but why)
+- Highlight common mistakes at tricky steps
+- Make sure the logic flow is crystal clear
+- ALWAYS complete all steps fully
+      `,
+      'show a simpler example': `
+You are creating a simpler version of the example to build understanding.
+
+GUIDELINES:
+- Use smaller numbers or simpler scenarios
+- Focus on the core concept without complications
+- Make it easy to follow mentally
+- Build confidence before tackling harder examples
+- ALWAYS complete the simpler example fully
+      `,
+      'show a harder example': `
+You are creating a more challenging example to deepen understanding.
+
+GUIDELINES:
+- Increase complexity (larger numbers, more steps, edge cases)
+- Include scenarios that require deeper thinking
+- Show how the concept extends to harder problems
+- Challenge the student appropriately
+- ALWAYS complete the harder example fully
+      `,
+
+      // === FORMULA BLOCK ACTIONS ===
+      'derive this': `
+You are deriving or proving where a formula comes from.
+
+GUIDELINES:
+- Show the step-by-step derivation
+- Start from known principles or formulas
+- Explain the mathematical reasoning at each step
+- Use proper LaTeX notation
+- ALWAYS complete the derivation fully
+      `,
+      'explain each term': `
+You are explaining what each term in a formula represents.
+
+GUIDELINES:
+- Go through each symbol/variable in the formula
+- Explain what it represents conceptually
+- Describe typical values or units
+- Connect to physical or intuitive meaning
+- ALWAYS explain all terms completely
+      `,
+      'show example': `
+You are showing how to use a formula with a concrete example.
+
+GUIDELINES:
+- Plug in specific values and solve
+- Show all the arithmetic steps
+- Interpret the result
+- Verify the answer makes sense
+- ALWAYS complete the example fully
+      `,
+
+      // === INSIGHT BLOCK ACTIONS ===
+      'give an example': `
+You are illustrating an insight with a concrete example.
+
+GUIDELINES:
+- Create an example that demonstrates the insight
+- Make it practical and memorable
+- Show how the insight helps in real situations
+- Connect to the student's experience
+- ALWAYS complete the example fully
+      `,
+
+      // === WARNING BLOCK ACTIONS ===
+      'explain the mistake': `
+You are explaining in detail why a common mistake is wrong.
+
+GUIDELINES:
+- Clearly describe what the mistake looks like
+- Explain why it's wrong (the underlying error)
+- Show what happens if you make this mistake
+- Help the student recognize it in their own work
+- ALWAYS complete your explanation fully
+      `,
+      'show correct approach': `
+You are demonstrating the correct way to approach something that's often done wrong.
+
+GUIDELINES:
+- Show the correct method step by step
+- Contrast with the wrong approach
+- Explain why the correct approach works
+- Give tips for remembering the right way
+- ALWAYS complete the correct approach fully
+      `,
+      'give example of error': `
+You are showing a concrete example of a common error.
+
+GUIDELINES:
+- Create a realistic scenario where the error occurs
+- Show the incorrect reasoning or calculation
+- Then show the correct version
+- Help the student spot the difference
+- ALWAYS complete both versions fully
+      `,
+
+      // === SUMMARY BLOCK ACTIONS ===
+      'expand on a point': `
+You are expanding on a specific point from a summary.
+
+GUIDELINES:
+- Add more detail and depth to key points
+- Provide additional context or examples
+- Connect to related ideas
+- Maintain the summary style but with more substance
+- ALWAYS complete your expansion fully
+      `,
+      'add more takeaways': `
+You are adding additional key takeaways to a summary.
+
+GUIDELINES:
+- Add 2-3 more important points to remember
+- Focus on practical, actionable insights
+- Keep them concise but meaningful
+- Complement existing takeaways
+- ALWAYS complete each takeaway fully
+      `,
+
+      // === CONCEPT BLOCK ACTIONS ===
+      'connect to other concepts': `
+You are showing how this concept connects to other ideas the student knows.
+
+GUIDELINES:
+- Identify 2-3 related concepts
+- Explain how they're connected or related
+- Show how understanding one helps with others
+- Create a mental map of relationships
+- ALWAYS complete your connections fully
+      `,
     };
 
-    const actionPrompt = actionPrompts[action] || actionPrompts.explain;
+    // Get the appropriate prompt, with fallback
+    let actionPrompt = actionPrompts[normalizedAction];
 
-    // Build context-aware prompt
+    // If no exact match, try to find a similar action or use default
+    if (!actionPrompt) {
+      // Check for partial matches
+      if (normalizedAction.includes('explain')) {
+        actionPrompt = actionPrompts['explain'];
+      } else if (normalizedAction.includes('simpl')) {
+        actionPrompt = actionPrompts['simplify'];
+      } else if (normalizedAction.includes('example')) {
+        actionPrompt = actionPrompts['add examples'];
+      } else if (normalizedAction.includes('expand') || normalizedAction.includes('detail') || normalizedAction.includes('more')) {
+        actionPrompt = actionPrompts['expand'];
+      } else if (normalizedAction.includes('prove') || normalizedAction.includes('deriv')) {
+        actionPrompt = actionPrompts['prove this'];
+      } else if (normalizedAction.includes('intuiti') || normalizedAction.includes('analog')) {
+        actionPrompt = actionPrompts['explain intuitively'];
+      } else {
+        // Default fallback
+        actionPrompt = actionPrompts['explain'];
+      }
+      console.log(`handleBlockAction: No exact match for "${action}", using fallback`);
+    }
+
+    // Build context-aware prompt with block type information
+    const blockTypeContext = blockType ? `\n**Block Type**: ${blockType} (adjust tone and depth accordingly)\n` : '';
+
     const prompt = `
 ${actionPrompt}
-
+${blockTypeContext}
 ${context ? `**Reading Context** (what the student was reading before this):
 ${context}
 
-` : ""}**Content to ${action}**:
+` : ''}**Content to work with**:
 ${content}
 
 **Critical Requirements**:
@@ -470,14 +810,15 @@ ${content}
 - Use Markdown for formatting
 - Use $ for inline math, $$ for display equations
 - No preamble or meta-commentary, just the result
+- Be thorough and complete
 
-Output ONLY the ${action === "explain" || action === "expand" || action === "examples" ? "new content to add" : "improved content"}:
+Output ONLY the result:
 `;
 
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
       generationConfig: {
-        temperature: action === "regenerate" ? 0.6 : 0.5,
+        temperature: normalizedAction.includes('regenerate') ? 0.6 : 0.5,
         topP: 0.9,
         maxOutputTokens: 2048, // Generous limit to ensure complete responses
       },
