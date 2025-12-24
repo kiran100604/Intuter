@@ -323,11 +323,108 @@ const buildMasterPrompt = (context) => {
 };
 
 /**
+ * Parses semantic blocks from AI-generated content with <!-- BLOCK --> markers
+ * @param {string} text - The AI's response
+ * @returns {object|null} - Parsed blocks or null if no semantic blocks found
+ */
+const parseSemanticBlocks = (text) => {
+  const blockRegex = /<!-- BLOCK: type="(\w+)" title="([^"]*)" -->([\s\S]*?)<!-- END BLOCK -->/g;
+  const blocks = [];
+  let match;
+
+  while ((match = blockRegex.exec(text)) !== null) {
+    const blockType = match[1];
+    const blockTitle = match[2];
+    const blockContent = match[3].trim();
+
+    if (blockContent) {
+      blocks.push({
+        type: blockType,
+        title: blockTitle,
+        content: blockContent
+      });
+    }
+  }
+
+  return blocks.length > 0 ? blocks : null;
+};
+
+/**
+ * Converts semantic blocks into the legacy story/theory/summary format
+ * for backward compatibility with the database schema and frontend
+ * @param {Array} blocks - Array of semantic blocks
+ * @returns {object} - Object with story, theory, summary, etc.
+ */
+const convertBlocksToLegacyFormat = (blocks) => {
+  // Categorize blocks by their semantic purpose
+  const contextBlocks = blocks.filter(b => b.type === 'context');
+  const intuitionBlocks = blocks.filter(b => b.type === 'intuition');
+  const summaryBlocks = blocks.filter(b => b.type === 'summary');
+  const theoryBlocks = blocks.filter(b =>
+    ['definition', 'concept', 'formula', 'theorem', 'example', 'insight', 'warning'].includes(b.type)
+  );
+
+  // Build story from context blocks
+  const story = contextBlocks
+    .map(b => `<!-- BLOCK: type="${b.type}" title="${b.title}" -->\n${b.content}\n<!-- END BLOCK -->`)
+    .join('\n\n');
+
+  // Build theory from intuition + theory blocks (preserve semantic markers)
+  const theoryParts = [
+    ...intuitionBlocks.map(b => `<!-- BLOCK: type="${b.type}" title="${b.title}" -->\n${b.content}\n<!-- END BLOCK -->`),
+    ...theoryBlocks.map(b => `<!-- BLOCK: type="${b.type}" title="${b.title}" -->\n${b.content}\n<!-- END BLOCK -->`)
+  ];
+  const theory = theoryParts.join('\n\n');
+
+  // Build summary
+  const summary = summaryBlocks
+    .map(b => `<!-- BLOCK: type="${b.type}" title="${b.title}" -->\n${b.content}\n<!-- END BLOCK -->`)
+    .join('\n\n');
+
+  // Count pedagogical elements
+  const pedagogicalElements = {
+    keyConcepts: blocks.filter(b => b.type === 'definition' || b.type === 'concept').length,
+    examples: blocks.filter(b => b.type === 'example').length,
+    proTips: blocks.filter(b => b.type === 'insight').length,
+    warnings: blocks.filter(b => b.type === 'warning').length,
+    theorems: blocks.filter(b => b.type === 'theorem').length,
+    formulas: blocks.filter(b => b.type === 'formula').length,
+    totalBlocks: blocks.length
+  };
+
+  return {
+    story: story || contextBlocks[0]?.content || '',
+    theory: theory || '',
+    summary: summary || summaryBlocks[0]?.content || '',
+    pedagogicalElements,
+    metadata: {
+      blockTypes: [...new Set(blocks.map(b => b.type))],
+      blockCount: blocks.length,
+      parsedFromSemanticBlocks: true
+    },
+    // Also store the raw blocks for future use
+    semanticBlocks: blocks
+  };
+};
+
+/**
  * Parses the raw markdown response from the AI into a structured object.
+ * Supports both semantic block format and legacy section-based format.
  * @param {string} text - The AI's response.
  * @returns {object} - An object with keys like 'story', 'theory', etc.
  */
 const parseAIResponse = (text) => {
+  // First, try to parse semantic blocks (new format)
+  const semanticBlocks = parseSemanticBlocks(text);
+
+  if (semanticBlocks && semanticBlocks.length > 0) {
+    console.log(`Parsed ${semanticBlocks.length} semantic blocks from AI response`);
+    return convertBlocksToLegacyFormat(semanticBlocks);
+  }
+
+  // Fall back to legacy section-based parsing
+  console.log("No semantic blocks found, falling back to legacy parsing");
+
   // Helper to extract content between two regex patterns
   const extractSection = (startPattern, endPattern) => {
     const parts = text.split(startPattern);
@@ -369,6 +466,27 @@ const parseAIResponse = (text) => {
       } catch (e) {
         console.error("Failed to parse metadata JSON:", e);
       }
+    }
+  }
+
+  // If legacy parsing also fails, try a more aggressive fallback
+  if (!story && !theoryBody) {
+    console.log("Legacy parsing failed, attempting fallback extraction");
+
+    // Just extract all text content as theory, using any structure we can find
+    const cleanedText = text
+      .replace(/```json[\s\S]*?```/g, '') // Remove JSON blocks
+      .replace(/<!-- .*? -->/g, '')        // Remove HTML comments
+      .trim();
+
+    if (cleanedText.length > 100) {
+      return {
+        story: "Content generated successfully.",
+        theory: cleanedText,
+        summary: "",
+        pedagogicalElements: { keyConcepts: 0, examples: 0, proTips: 0 },
+        metadata: { fallbackParsing: true },
+      };
     }
   }
 
@@ -414,13 +532,24 @@ exports.generateContent = async ({ subtopicId }) => {
     // 4. Parse the AI's response
     const parsedContent = parseAIResponse(text);
 
-    if (!parsedContent.story || !parsedContent.theory) {
+    // Validate parsed content - be lenient: we need at least some content
+    const hasContent = parsedContent.story || parsedContent.theory || parsedContent.semanticBlocks?.length > 0;
+
+    if (!hasContent) {
       console.error("AI Response Parsing Failed. Raw Text Length:", text.length);
       console.error("Raw Text Preview:", text.substring(0, 500) + "...");
       console.error("Parsed Content:", JSON.stringify(parsedContent, null, 2));
       throw new AIGenerationError(
         "Failed to parse the AI response into the required structure.",
       );
+    }
+
+    // Ensure story and theory have at least placeholder content for DB compatibility
+    if (!parsedContent.story && parsedContent.theory) {
+      parsedContent.story = "Content introduction";
+    }
+    if (!parsedContent.theory && parsedContent.story) {
+      parsedContent.theory = parsedContent.story;
     }
 
     // 5. Save Structured Content
