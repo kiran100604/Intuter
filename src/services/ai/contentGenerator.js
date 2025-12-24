@@ -324,25 +324,73 @@ const buildMasterPrompt = (context) => {
 
 /**
  * Parses semantic blocks from AI-generated content with <!-- BLOCK --> markers
+ * Handles various edge cases and normalizes content for robust parsing
  * @param {string} text - The AI's response
  * @returns {object|null} - Parsed blocks or null if no semantic blocks found
  */
 const parseSemanticBlocks = (text) => {
-  const blockRegex = /<!-- BLOCK: type="(\w+)" title="([^"]*)" -->([\s\S]*?)<!-- END BLOCK -->/g;
+  if (!text || typeof text !== 'string') {
+    console.log("parseSemanticBlocks: Invalid input text");
+    return null;
+  }
+
+  // Normalize the text - handle potential encoding issues
+  const normalizedText = text
+    .replace(/\r\n/g, '\n')  // Normalize line endings
+    .replace(/\r/g, '\n');
+
+  // Try multiple regex patterns to handle variations in formatting
+  const patterns = [
+    // Standard format
+    /<!--\s*BLOCK:\s*type="(\w+)"\s*title="([^"]*)"\s*-->([\s\S]*?)<!--\s*END\s*BLOCK\s*-->/gi,
+    // Single quotes variant
+    /<!--\s*BLOCK:\s*type='(\w+)'\s*title='([^']*)'\s*-->([\s\S]*?)<!--\s*END\s*BLOCK\s*-->/gi,
+    // Flexible whitespace
+    /<!--\s*BLOCK\s*:\s*type\s*=\s*"(\w+)"\s*title\s*=\s*"([^"]*)"\s*-->([\s\S]*?)<!--\s*END\s+BLOCK\s*-->/gi,
+  ];
+
   const blocks = [];
-  let match;
 
-  while ((match = blockRegex.exec(text)) !== null) {
-    const blockType = match[1];
-    const blockTitle = match[2];
-    const blockContent = match[3].trim();
+  for (const pattern of patterns) {
+    let match;
+    // Reset lastIndex for global regex
+    pattern.lastIndex = 0;
 
-    if (blockContent) {
-      blocks.push({
-        type: blockType,
-        title: blockTitle,
-        content: blockContent
-      });
+    while ((match = pattern.exec(normalizedText)) !== null) {
+      const blockType = match[1].toLowerCase();
+      const blockTitle = match[2];
+      const blockContent = match[3].trim();
+
+      // Only add if we have content and haven't already added this block
+      if (blockContent && !blocks.some(b => b.content === blockContent)) {
+        blocks.push({
+          type: blockType,
+          title: blockTitle,
+          content: blockContent
+        });
+      }
+    }
+
+    // If we found blocks with this pattern, don't try other patterns
+    if (blocks.length > 0) {
+      break;
+    }
+  }
+
+  // Log what we found for debugging
+  if (blocks.length > 0) {
+    console.log(`parseSemanticBlocks: Found ${blocks.length} blocks with types: ${blocks.map(b => b.type).join(', ')}`);
+  } else {
+    // Check if the text contains block markers at all
+    const hasBlockMarkers = normalizedText.includes('<!-- BLOCK') || normalizedText.includes('<!--BLOCK');
+    const hasEndMarkers = normalizedText.includes('END BLOCK') || normalizedText.includes('END_BLOCK');
+    console.log(`parseSemanticBlocks: No blocks found. Has start markers: ${hasBlockMarkers}, Has end markers: ${hasEndMarkers}`);
+
+    // If markers exist but regex didn't match, log a sample for debugging
+    if (hasBlockMarkers) {
+      const sampleStart = normalizedText.indexOf('<!--');
+      const sampleEnd = Math.min(sampleStart + 200, normalizedText.length);
+      console.log(`parseSemanticBlocks: Sample of first marker: ${normalizedText.substring(sampleStart, sampleEnd)}`);
     }
   }
 
@@ -473,10 +521,34 @@ const parseAIResponse = (text) => {
   if (!story && !theoryBody) {
     console.log("Legacy parsing failed, attempting fallback extraction");
 
-    // Just extract all text content as theory, using any structure we can find
+    // Check if the raw text contains semantic block content that we can use
+    // The regex didn't match but the content might still be useful
+    const hasSemanticContent = text.includes('<!-- BLOCK');
+
+    if (hasSemanticContent) {
+      console.log("Text contains semantic markers - extracting raw content with markers preserved");
+
+      // Keep the semantic markers but clean up metadata
+      const contentWithMarkers = text
+        .replace(/```json[\s\S]*?```/g, '')  // Remove JSON blocks only
+        .replace(/##\s*\d+\.\s*\w+[^\n]*/g, '')  // Remove section headers
+        .trim();
+
+      if (contentWithMarkers.length > 100) {
+        return {
+          story: "Content generated successfully.",
+          theory: contentWithMarkers,
+          summary: "",
+          pedagogicalElements: { keyConcepts: 0, examples: 0, proTips: 0 },
+          metadata: { fallbackParsing: true, preservedSemanticMarkers: true },
+        };
+      }
+    }
+
+    // Last resort: just extract all text content as theory
     const cleanedText = text
       .replace(/```json[\s\S]*?```/g, '') // Remove JSON blocks
-      .replace(/<!-- .*? -->/g, '')        // Remove HTML comments
+      .replace(/<!--\s*(?!BLOCK|END).*?-->/g, '')  // Remove non-semantic HTML comments
       .trim();
 
     if (cleanedText.length > 100) {
