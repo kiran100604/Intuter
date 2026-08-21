@@ -392,20 +392,4 @@ npm run migrate
 
 MIT License - See LICENSE file for details
 
-## Support & Contact
 
-- **Issues**: GitHub Issues page
-- **Email**: kiran@example.com
-- **Documentation**: [Wiki](#)
-
-## Acknowledgments
-
-- Google Gemini API for AI capabilities
-- Sequelize for robust ORM
-- The amazing open-source community
-
----
-
-**Built with ❤️ for learners everywhere**
-
-**Last Updated**: December 2025
